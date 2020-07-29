@@ -1,7 +1,7 @@
 import urllib.request
 import datetime
-from datetime import timedelta
 import pathlib
+import sys
 
 import pandas as pd
 import numpy as np
@@ -25,6 +25,10 @@ def import_omni_month(StartDateTime, EndDateTime, Resolution='1min',
     Returns:
 
     Data -  DataFrame
+    
+    Author: Andy Smith
+    Updated: Ross Dobson July 2020
+    
     """
 
     Year = datetime.datetime.strftime(StartDateTime, '%Y')
@@ -45,18 +49,15 @@ def import_omni_month(StartDateTime, EndDateTime, Resolution='1min',
               '60MeVProton']
 
     # Check if already downloaded as these files are big bois
-    try:
-        FDirLocal = pathlib.Path('Data/OMNI/')
-        FNameLocal = FDirLocal / ('OMNI_1min_'+Year+Month+'.asc')
-        Data = pd.read_csv(FNameLocal, sep='\s+', names=Header, header=None)
-        Data['DateTime'] = Data.apply(lambda row:
-                                      datetime(int(row.Year), 1, 1)
-                                      + timedelta(days=int(row.Day) - 1)
-                                      + timedelta(seconds=row.Hour*60*60
-                                                  + row.Minute*60),
-                                      axis=1)
-        print('Found local data at '+FNameLocal)
+    FDirLocal = pathlib.Path('Data/OMNI/')
+    FNameLocal = FDirLocal / ('OMNI_1min_'+Year+Month+'.asc')
 
+    try:
+        Data = pd.read_csv(FNameLocal, sep='\s+', names=Header, header=None)
+        print('Local data found at', FNameLocal)
+
+        Data['DateTime'] = Data.apply(lambda row: datetime.datetime(int(row.Year), 1, 1)+datetime.timedelta(days=int(row.Day) - 1)+datetime.timedelta(seconds=row.Hour*60*60+row.Minute*60), axis=1)
+        
     # FileNotFoundError from pd.read_csv means we need to download.
     except FileNotFoundError:
 
@@ -70,32 +71,30 @@ def import_omni_month(StartDateTime, EndDateTime, Resolution='1min',
         urllib.request.urlretrieve(FNameWeb, FNameLocal)  # Saves to FNameLocal
         print('Data downloaded.')
 
-        # Data = pd.read_csv(FNameLocal, sep='\s+', names=Header, header=None)
-        # Data['DateTime'] = Data.apply(lambda row:
-        #                               datetime(int(row.Year), 1, 1)
-        #                               + timedelta(days=int(row.Day) - 1)
-        #                               + timedelta(seconds=row.Hour*60*60
-        #                                           + row.Minute*60),
-        #                               axis=1)
+        Data = pd.read_csv(FNameLocal, sep='\s+', names=Header, header=None)
+        Data['DateTime'] = Data.apply(lambda row: datetime.datetime(int(row.Year), 1, 1)+datetime.timedelta(days=int(row.Day) - 1)+datetime.timedelta(seconds=row.Hour*60*60+row.Minute*60), axis=1)
 
-        # Data = Data[(Data.DateTime >= StartDateTime)
-        #             & (Data.DateTime <= EndDateTime)]
+        # Select the data within our range - failsafe?
+        Data = Data[(Data.DateTime >= StartDateTime)
+                    & (Data.DateTime <= EndDateTime)]
 
-        # # Bodge any borked data with NaN.
-        # Data = Data.replace(99.99, np.nan)
-        # Data = Data.replace(999.9, np.nan)
-        # Data = Data.replace(999.99, np.nan)
-        # Data = Data.replace(9999.99, np.nan)
-        # Data = Data.replace(99999.9, np.nan)
-        # Data = Data.replace(9999999., np.nan)
+        # Bodge any borked data with NaN.
+        Data = Data.replace(99.99, np.nan)
+        Data = Data.replace(999.9, np.nan)
+        Data = Data.replace(999.99, np.nan)
+        Data = Data.replace(9999.99, np.nan)
+        Data = Data.replace(99999.9, np.nan)
+        Data = Data.replace(9999999., np.nan)
 
-    # Data.index = Data['DateTime']
+    # Make DateTime the index of the dataframe
+    Data.index = Data['DateTime']
 
-    # if Columns != 'All':
+    # We defined this up the top, remember? Passed in.
+    if Columns != 'All':
 
-    #     Data = Data[Columns]
+        Data = Data[Columns]
 
-    # return Data
+    return Data
 
 
 def main():
@@ -104,7 +103,7 @@ def main():
     startDT = datetime.datetime(2003, 10, 1)
     endDT = datetime.datetime(2003, 10, 31)
     data = import_omni_month(startDT, endDT)
-    data
+    print(data)
 
 
 main()
