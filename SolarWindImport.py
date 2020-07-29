@@ -1,10 +1,10 @@
 import urllib.request
 import datetime
-from pathlib import Path
+from datetime import timedelta
+import pathlib
 
 import pandas as pd
 import numpy as np
-import sys
 
 
 def import_omni_month(StartDateTime, EndDateTime, Resolution='1min',
@@ -25,7 +25,6 @@ def import_omni_month(StartDateTime, EndDateTime, Resolution='1min',
     Returns:
 
     Data -  DataFrame
-
     """
 
     Year = datetime.datetime.strftime(StartDateTime, '%Y')
@@ -47,7 +46,7 @@ def import_omni_month(StartDateTime, EndDateTime, Resolution='1min',
 
     # Check if already downloaded as these files are big bois
     try:
-        FDirLocal = Path('Data/OMNI/')
+        FDirLocal = pathlib.Path('Data/OMNI/')
         FNameLocal = FDirLocal / ('OMNI_1min_'+Year+Month+'.asc')
         Data = pd.read_csv(FNameLocal, sep='\s+', names=Header, header=None)
         Data['DateTime'] = Data.apply(lambda row:
@@ -58,42 +57,45 @@ def import_omni_month(StartDateTime, EndDateTime, Resolution='1min',
                                       axis=1)
         print('Found local data at '+FNameLocal)
 
-    # IOError from pd.read_csv if the file doesn't exist. Need to download.
-    except IOError:
+    # FileNotFoundError from pd.read_csv means we need to download.
+    except FileNotFoundError:
 
         print('Local data not found -> '
               + 'downloading from https://spdf.sci.gsfc.nasa.gov')
         FNameWeb = ('https://spdf.sci.gsfc.nasa.gov/pub/data/omni/' +
                     'high_res_omni/monthly_1min/omni_min'+Year+Month+'.asc')
+        print('Creating local directory (skips if already exists)')
+        pathlib.Path(FDirLocal).mkdir(exist_ok=True)
+        print('Done. Downloading data to: ', FNameLocal)
         urllib.request.urlretrieve(FNameWeb, FNameLocal)  # Saves to FNameLocal
         print('Data downloaded.')
 
-        Data = pd.read_csv(FNameLocal, sep='\s+', names=Header, header=None)
-        Data['DateTime'] = Data.apply(lambda row:
-                                      datetime(int(row.Year), 1, 1)
-                                      + timedelta(days=int(row.Day) - 1)
-                                      + timedelta(seconds=row.Hour*60*60
-                                                  + row.Minute*60),
-                                      axis=1)
+        # Data = pd.read_csv(FNameLocal, sep='\s+', names=Header, header=None)
+        # Data['DateTime'] = Data.apply(lambda row:
+        #                               datetime(int(row.Year), 1, 1)
+        #                               + timedelta(days=int(row.Day) - 1)
+        #                               + timedelta(seconds=row.Hour*60*60
+        #                                           + row.Minute*60),
+        #                               axis=1)
 
-        Data = Data[(Data.DateTime >= StartDateTime)
-                    & (Data.DateTime <= EndDateTime)]
+        # Data = Data[(Data.DateTime >= StartDateTime)
+        #             & (Data.DateTime <= EndDateTime)]
 
-        # Bodge any borked data with NaN.
-        Data = Data.replace(99.99, np.nan)
-        Data = Data.replace(999.9, np.nan)
-        Data = Data.replace(999.99, np.nan)
-        Data = Data.replace(9999.99, np.nan)
-        Data = Data.replace(99999.9, np.nan)
-        Data = Data.replace(9999999., np.nan)
+        # # Bodge any borked data with NaN.
+        # Data = Data.replace(99.99, np.nan)
+        # Data = Data.replace(999.9, np.nan)
+        # Data = Data.replace(999.99, np.nan)
+        # Data = Data.replace(9999.99, np.nan)
+        # Data = Data.replace(99999.9, np.nan)
+        # Data = Data.replace(9999999., np.nan)
 
-    Data.index = Data['DateTime']
+    # Data.index = Data['DateTime']
 
-    if Columns != 'All':
+    # if Columns != 'All':
 
-        Data = Data[Columns]
+    #     Data = Data[Columns]
 
-    return Data
+    # return Data
 
 
 def main():
