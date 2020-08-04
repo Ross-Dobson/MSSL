@@ -160,16 +160,26 @@ def main():
             startDT[i], endDT[i], Resolution='1min', Columns='All')
         if (i == 9):
             october_data = this_month_data
+        if (i == 10):
+            november_data = this_month_data
         # print(this_month_data)
         data = pd.concat([data, this_month_data])  # add it into the main DF
 
+    interest_data = pd.concat([october_data,november_data])
     print(data)
     plot_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'AL', 'P', 'V']
     for val in plot_vals:
-        year_title = val + ' in 2003'
-        october_title = val + ' in October 2003'
-        data.plot(x='DateTime', y=val, title=year_title)
-        october_data.plot(x='DateTime', y=val, title=october_title)
+        
+        # year_title = str(val) + ' in ' + str(year)
+        # data.plot(x='DateTime', y=val, title=year_title)
+       
+        # interest_title = str(val) + ' in October and November 2003'
+        # interest_data.plot(x='DateTime', y=val, title=interest_title)
+        plotvals_data = data[plot_vals]
+        plotvals_interest = interest_data[plot_vals]
 
+        print(plotvals_data.corr())
+        print(plotvals_interest.corr())
 
+        
 main()
