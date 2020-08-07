@@ -59,7 +59,7 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
                    '30MeVProton', '60MeVProton']
 
     # Check if already downloaded as these files are big bois
-    asc_dir = pathlib.Path('Data/OMNI/')
+    asc_dir = pathlib.Path('Data/OMNI/asc/')
     asc_fname = 'OMNI_1min_' + year_str + month_str + '.asc'
     asc_path = asc_dir / asc_fname
 
