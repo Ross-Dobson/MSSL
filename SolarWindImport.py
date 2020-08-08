@@ -152,7 +152,7 @@ def leapcheck(year):
 def import_omni_year(year):
     """docstring lolol"""
 
-    pkl_dir = pathlib.Path('Data/OMNI/')
+    pkl_dir = pathlib.Path('Data/OMNI/pickles')
     pkl_fname = str(year) + '.pkl'
     pkl_path = pkl_dir / pkl_fname
 
