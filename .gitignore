@@ -1,4 +1,6 @@
 Figures/
-Data/pickles
+Data/OMNI/pickles
 __pycache__
 .ipynb_checkpoints
+*#
+*~
