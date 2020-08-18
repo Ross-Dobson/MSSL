@@ -60,18 +60,18 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
                    'AsyH', 'PCN', 'MagnetosonicMach', '10MeVProton',
                    '30MeVProton', '60MeVProton']
 
-    # Check if already downloaded as these files are big
+    # Check if already downloaded because these files are big
     asc_dir = pathlib.Path('Data/OMNI/asc/')
     asc_fname = 'OMNI_1min_' + year_str + month_str + '.asc'
     asc_path = asc_dir / asc_fname
 
     try:
-        # headers are NOT stored in the asc data files, so header=None
-        # instead, manually passed in via 'names'
+        # headers are NOT stored in the NASA asc data files, so header=None
+        # instead, manually passed in via 'names'. Not ideal, but it works...
         data = pd.read_csv(asc_path, sep='\s+', names=omni_header, header=None)
         print('Local data found at', asc_path)
 
-        # not entirely sure what this is doing - just generating then
+        # not entirely sure what this is doing - just generating the
         # column of datetimes to use as the index?
         data['DateTime'] = data.apply(
             lambda row:
@@ -98,10 +98,10 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
         urllib.request.urlretrieve(asc_url, asc_path)  # Saves to asc_path
         print('Data downloaded.')
 
-        # headers NOT in data, passed in via 'names' parameter instead
+        # again, headers NOT in data, passed in via 'names' parameter instead
         data = pd.read_csv(asc_path, sep='\s+', names=omni_header, header=None)
 
-        # same as above, whatever that does
+        # same as above, think it just generates datetimes
         data['DateTime'] = data.apply(
             lambda row:
             datetime.datetime(int(row.Year), 1, 1)
@@ -113,7 +113,7 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
     data = data[(data.DateTime >= start_datetime)
                 & (data.DateTime <= end_datetime)]
 
-    # Bodge any borked data with NaN, easier to deal with, pd deals with better
+    # Bodge broken data with NaN, easier to interpolate later, pd is happier
     data = data.replace(99.99, np.nan)
     data = data.replace(999.9, np.nan)
     data = data.replace(999.99, np.nan)
@@ -197,7 +197,7 @@ def import_omni_year(year):
 
 
 def main():
-    print("Don't execute me. Import me and use my functions.")
+    print("Don't execute this file. Import it and use its functions.")
 
 
 if __name__ == "__main__":
