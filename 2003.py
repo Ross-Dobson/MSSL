@@ -1,7 +1,8 @@
 import pathlib  # used for compatibility with non-POSIX systems
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import datetime
 # remember to run 'matplotlib tk' in the interpreter
 
 from sklearn import linear_model
@@ -19,7 +20,7 @@ def main():
     # The method import_omni_year checks for Pickles itself
     # so we do not need to enclose this in a try statement
     year = 2003
-    df_2003 = import_omni_year(year)
+    data_2003 = import_omni_year(year)
 
     # ---------------------------------------------------------------
     # IMPORTING OCTOBER AND NOVEMBER SEPERATELY TO ZOOM IN
@@ -46,8 +47,8 @@ def main():
     #     df_oct_nov_2003.to_pickle(oct_nov_pkl_path)  # store for future use
 
     print("All 2003 data has been loaded.")
-    print("\nDF 2003:")
-    print(df_2003)
+    print("\n2003 data:")
+    print(data_2003)
 
     # ---------------------------------------------------------------
     # PLOTTING THE PARAMETERS
@@ -64,7 +65,7 @@ def main():
     # CORRELATION MATRIX BEFORE SCALER
 
     print("\nCorrelation matrix for 2003:")
-    corr_2003 = df_2003[plot_vals].corr()
+    corr_2003 = data_2003[plot_vals].corr()
     print(corr_2003)
 
     # print("\nCorrelation matrix for October & November 2003\n")
@@ -79,30 +80,60 @@ def main():
 
     # Now get just that data. Get AL seperately, as it's the output/target here
     # This also makes it more futureproof for changing the target
-    df2 = df_2003[model_vals]
-    AL = df_2003['AL']
+    # df = df_2003[model_vals]
+    # AL = df_2003['AL']
 
-    print("\nDF2:")
-    print(df2)
+    # print("\nDF2:")
+    # print(df2)
 
-    # strip the labels and column headers
-    df3 = df2.to_numpy()  # we don't need to .T, each column is a feature
-    AL2 = AL.to_numpy()
-    # print(df3.shape)
-    AL3 = AL2.reshape(-1, 1)  # however, this needs to be .T'd into a column
+    # # strip the labels and column headers
+    # df3 = df2.to_numpy()  # we don't need to .T, each column is a feature
+    # AL2 = AL.to_numpy()
+    # # print(df3.shape)
+    # AL3 = AL2.reshape(-1, 1)  # however, this needs to be .T'd into a column
+
+    # # scale the main features
+    # scaler = StandardScaler()
+    # scaler = scaler.fit(df3)
+    # df4 = scaler.transform(df3)
+    # df5 = df4.T  # make each ROW, not column, a feature, to plot histogram
+
+    # # scale AL
+    # scaler2 = StandardScaler()
+    # scaler2 = scaler2.fit(AL3)
+    # AL4 = scaler2.transform(AL3)
+    # AL5 = AL4.T
+
+    df_2003 = data_2003[model_vals]
+    df_2003_cols = df_2003.columns  # column labels
+    df_2003_index = df_2003.index  # row labels
+
+    df_AL = data_2003['AL']
+    df_AL_index = df_AL.index  # should be same as df anyway, just datetimes
 
     # scale the main features
     scaler = StandardScaler()
-    scaler = scaler.fit(df3)
-    df4 = scaler.transform(df3)
-    df5 = df4.T  # make each ROW a feature, not each column, to plot histogram
+    scaler = scaler.fit(df_2003)
+    arr_2003_scaled = scaler.transform(df_2003)
+    # need to add it back into a DF
+    df_2003 = pd.DataFrame(arr_2003_scaled,
+                           columns=df_2003_cols, index=df_2003_index)
+    print(df_2003)
 
     # scale AL
     scaler2 = StandardScaler()
-    scaler2 = scaler2.fit(AL3)
-    AL4 = scaler2.transform(AL3)
-    AL5 = AL4.T
+    arr_AL = df_AL.to_numpy()
+    arr_AL = arr_AL.reshape(-1, 1)
+    scaler2 = scaler2.fit(arr_AL)
+    arr_AL_scaled = scaler2.transform(arr_AL)
+    df_AL = pd.DataFrame(arr_AL_scaled, columns=['AL'], index=df_AL_index)
 
+    # ---------------------------------------------------------------
+    # INTERPOLATING AND REMOVING NAN VALUES
+    # resample the data into one minute chunks?
+    # df_resampled = df.resample('1T',
+    #                            loffset=datetime.timedelta(seconds=30.)).mean()
+    # df = df_resampled.interpolate(method = 'linear', limit = 15)
     # ---------------------------------------------------------------
     # CORR AFTER STANDARDISATION
 
@@ -118,11 +149,11 @@ def main():
 
     # for i, param in enumerate(model_vals):
     #     plt.figure()
-    #     plt.hist(df5[i], bins=36)
+    #     plt.hist(df.T[i], bins=36)
     #     plt.title('Histogram of '+param+' after StandardScaler')
 
     # plt.figure()
-    # plt.hist(AL4, bins=36)
+    # plt.hist(AL, bins=36)
     # plt.title('Histogram of AL after StandardScaler')
 
     # ---------------------------------------------------------------
@@ -130,11 +161,11 @@ def main():
 
     # df4/AL4 not 5 here! Needs shape (n_samples, n_features) -> 525600 samples
     # Split the data into two parts, one for training and testing
-    print(df4.shape)
-    print(AL4.shape)
+    # print(df4.shape)
+    # print(AL4.shape)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        df4, AL4, test_size=0.4, random_state=47)
+    # X_train, X_test, y_train, y_test = train_test_split(
+        # df4, AL4, test_size=0.4, random_state=47)
 
     # ---------------------------------------------------------------
     # LINEAR REGRESSION
