@@ -142,9 +142,12 @@ def main():
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     # resample the data into one minute chunks
-    # df_resampled = df.resample('1T',
-    # loffset=datetime.timedelta(seconds=30.)).mean()
-    # df = df_resampled.interpolate(method='linear', limit=15)
+
+    df_resampled = df_2003.resample(
+        '1T', loffset=datetime.timedelta(seconds=30.)).mean()
+    df_2003 = df_resampled.interpolate(method='linear', limit=15)
+    # I've tested, this does work. Can use np.isnan on each value to check
+
     # ---------------------------------------------------------------
     # REMOVING NaN VALUES
     # df.dropna?
