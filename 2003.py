@@ -150,7 +150,11 @@ def main():
 
     # ---------------------------------------------------------------
     # REMOVING NaN VALUES
-    # df.dropna?
+    # go by rows, delete if ANY values are NaN, do this in same df
+    df_2003.dropna(axis='index', how='any', inplace=True)
+    # to check this has worked, notice the last 30 minutes on Dec 31 are gone.
+    # previously, these were riddled with NaNs.
+    
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
 
