@@ -118,6 +118,7 @@ def main():
     # need to add it back into a DF
     df_2003 = pd.DataFrame(arr_2003_scaled,
                            columns=df_2003_cols, index=df_2003_index)
+    print("\nDF 2003 after scaling:\n")
     print(df_2003)
 
     # scale AL
@@ -128,19 +129,25 @@ def main():
     arr_AL_scaled = scaler2.transform(arr_AL)
     df_AL = pd.DataFrame(arr_AL_scaled, columns=['AL'], index=df_AL_index)
 
-    # ---------------------------------------------------------------
-    # INTERPOLATING AND REMOVING NAN VALUES
-    # resample the data into one minute chunks?
-    # df_resampled = df.resample('1T',
-    #                            loffset=datetime.timedelta(seconds=30.)).mean()
-    # df = df_resampled.interpolate(method = 'linear', limit = 15)
+    print("\nAL after scaling\n")
+    print(df_AL)
+
     # ---------------------------------------------------------------
     # CORR AFTER STANDARDISATION
+    df_2003.insert(4, "AL", arr_AL_scaled)
+    print("\nDEBUG\n")
+    print(df_2003)
+    print(df_2003.corr())
 
-    # think I need to add AL5's [0] back into AL's place (but i'th row instead
-    # of i'th column number). Then transpose the whole thing, then we can add
-    # the index and column labels back in?
-
+    # ---------------------------------------------------------------
+    # INTERPOLATING GAPS
+    # resample the data into one minute chunks
+    # df_resampled = df.resample('1T',
+    # loffset=datetime.timedelta(seconds=30.)).mean()
+    # df = df_resampled.interpolate(method='linear', limit=15)
+    # ---------------------------------------------------------------
+    # REMOVING NaN VALUES
+    # df.dropna?
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
 
