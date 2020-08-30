@@ -120,7 +120,7 @@ def main():
     # INTERPOLATING GAPS
     # resample the data into one minute chunks
 
-    # unsure as to why we do this resample first
+    # just a failsafe, ensure everything is 1 minutes apart
     df_resampled = df_2003.resample(
         '1T', loffset=datetime.timedelta(seconds=30.)).mean()
     df_2003 = df_resampled.interpolate(method='linear', limit=15)
@@ -146,19 +146,23 @@ def main():
 
     # ---------------------------------------------------------------
     # DISCRETIZE AL
-    df_AL = df_2003['AL']
-    print("\nDiscretizing AL:\n")
+    df_AL = df_2003['AL'].copy()
 
-    # df_AL.rolling(30).min()
-    # TODO: need to align to right - use shift as per stack overflow?
+    # Roll right, 30 minutes.
+    # E.g. 12:00-12:30 -> 12:30, 12:01-12:31 -> 12:31
+    discrete_AL = df_AL.rolling(30).min()
+
+    # now, because this isn't a native argument, we roll left by shifting
+    discrete_AL = discrete_AL.shift(-30)
 
     # ---------------------------------------------------------------
     # TRAIN TEST SPLIT
 
-    # df4/AL4 not 5 here! Needs shape (n_samples, n_features) -> 525600 samples
+    # Needs shape (n_samples, n_features) -> 525600 samples
     # Split the data into two parts, one for training and testing
-    # print(df4.shape)
-    # print(AL4.shape)
+    print(df_2003)
+    
+    print(discrete_AL)
 
     # X_train, X_test, y_train, y_test = train_test_split(
         # df4, AL4, test_size=0.4, random_state=47)
