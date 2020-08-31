@@ -5,9 +5,10 @@ import pandas as pd
 import datetime
 # remember to run 'matplotlib tk' in the interpreter
 
-from sklearn import linear_model
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.naive_bayes import GaussianNB
 
 from SolarWindImport import import_omni_year, import_omni_month
 
@@ -117,7 +118,6 @@ def main():
 
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
-    # TODO: formally investigate mutual information?
 
     # removing n_p - in the words of Mayur
     # "by far weakest correlation with AL and a strong correlation with P"
@@ -163,7 +163,6 @@ def main():
 
     # ---------------------------------------------------------------
     # TEMPORARY SOLUTION TO NAN ISSUES FROM TIMESHIFTING
-    # TODO talk to andy/mayur about this
 
     # drop the nans in the last 30 elements of the discretized AL
     discrete_AL.dropna(axis='index', how='any', inplace=True)
@@ -187,20 +186,59 @@ def main():
     # ---------------------------------------------------------------
     # LINEAR REGRESSION
     # create the linear regression object
-    regr = linear_model.LinearRegression()
+    regr = LinearRegression()
 
-    # train it
+    # train it on the training data
     regr.fit(X_train, y_train)
+
+    # ---------------------------------------------------------------
+    # LOGISTIC REGRESSION
+    # :thonk:
+
+    # ---------------------------------------------------------------
+    # GAUSSIAN NAIVE BAYES
+    # create the Gaussian Naive Bayes object
+    gnb = GaussianNB()
+
+    # train it on the training data
+    # gnb.fit(X_train, y_train)
 
     # ---------------------------------------------------------------
     # CROSS VALIDATION
     # using 10 folds
-    # TODO what k value to use?
-    # TODO what scoring parameter to use? default is whatever model default is
     regr_scores = cross_val_score(regr, df_2003, discrete_AL, cv=10)
     print("The linear regression CV scores are", regr_scores)
     print("Accuracy: %0.2f (+/- %0.2f)" %
           (regr_scores.mean(), regr_scores.std() * 2))
 
+    gnb_scores = cross_val_score(gnb, df_2003, discrete_AL, cv=10)
+    print("The gaussian naive bayes CV scores are", gnb_scores)
+    print("Accuracy: %0.2f (+/- %0.2f)" %
+          (gnb_scores.mean(), gnb_scores.std() * 2))
 
+
+# TODO: SCALER/TRANSFORMING THE DATA
+# do we need to hold out data for this? something about in sklearn docs
+# but not sure if it applies to us. Doesn't actually change correlations
+# docs suggest using a Pipeline object to do all of this
+
+# TODO: REMOVING USELESS PARAMETERS
+# formally investigate mutual information?
+
+# TODO: TIMESHIFTING NaNs
+# is the best solution? Does this defeat point of timeshifting in first place?
+
+# TODO: CROSS VALIDATION
+# what k value to use?
+# what scoring paramemeter? default is whatever model default is
+# should i use cross_validate instead?
+
+# TODO: GAUSSIAN NAIVE BAYES
+# how do I deal with the value error? Doing astype(float) didnt help
+
+# TODO: LOGISTIC REGRESSION
+# can't get my head around the function - tried reading up on the different
+# parameters, particularly algorithms, penalties and behaviours etc but still
+# not entirely sure whats the best approach to implement this.
+# do I want the LogisticRegressionCV function?
 main()
