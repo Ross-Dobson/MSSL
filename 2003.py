@@ -162,28 +162,45 @@ def main():
     discrete_AL = discrete_AL.shift(-30)
 
     # ---------------------------------------------------------------
+    # TEMPORARY SOLUTION TO NAN ISSUES FROM TIMESHIFTING
+    # TODO talk to andy/mayur about this
+
+    # drop the nans in the last 30 elements of the discretized AL
+    discrete_AL.dropna(axis='index', how='any', inplace=True)
+
+    # now, drop the last 30 minutes of all the other data so shapes stay equal
+    df_2003.drop(df_2003.tail(30).index, inplace=True)
+
+    # ---------------------------------------------------------------
     # TRAIN TEST SPLIT
 
-    # Needs shape (n_samples, n_features) -> 525600 samples
+    # Needs shape (n_samples, n_features)
     # Split the data into two parts, one for training and testing
     print(df_2003)
     print(discrete_AL)
 
     # 60% of data for training, 40% of data held back for testing
+    # using 47 as seed for repeatbility (its 42 rounded for inflation :P)
     X_train, X_test, y_train, y_test = train_test_split(
         df_2003, discrete_AL, test_size=0.4, random_state=47)
 
     # ---------------------------------------------------------------
     # LINEAR REGRESSION
     # create the linear regression object
-    # regr = linear_model.LinearRegression()
+    regr = linear_model.LinearRegression()
 
-    # # train it
-    # regr.fit(X_train, y_train)
+    # train it
+    regr.fit(X_train, y_train)
 
-    # cross-validation
-    # scores = cross_val_score(regr, X_train, y_train, cv=10)
-    # print(scores)
+    # ---------------------------------------------------------------
+    # CROSS VALIDATION
+    # using 10 folds
+    # TODO what k value to use?
+    # TODO what scoring parameter to use? default is whatever model default is
+    regr_scores = cross_val_score(regr, df_2003, discrete_AL, cv=10)
+    print("The linear regression CV scores are", regr_scores)
+    print("Accuracy: %0.2f (+/- %0.2f)" %
+          (regr_scores.mean(), regr_scores.std() * 2))
 
 
 main()
