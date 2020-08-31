@@ -106,7 +106,6 @@ def main():
 
     # need to add it back into a DF
     df_AL = pd.DataFrame(arr_AL_scaled, columns=['AL'], index=df_AL_index)
-
     # print("\nAL after scaling\n")
     # print(df_AL)
 
@@ -116,6 +115,13 @@ def main():
     print("\nCorr after standardization:\n")
     print(df_2003.corr())
 
+    # ---------------------------------------------------------------
+    # REMOVING USELESS PARAMETERS
+    # TODO: formally investigate mutual information?
+
+    # removing n_p - in the words of Mayur
+    # "by far weakest correlation with AL and a strong correlation with P"
+    df_2003 = df_2003.drop(["n_p"], axis=1)
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     # resample the data into one minute chunks
@@ -161,11 +167,11 @@ def main():
     # Needs shape (n_samples, n_features) -> 525600 samples
     # Split the data into two parts, one for training and testing
     print(df_2003)
-    
     print(discrete_AL)
 
-    # X_train, X_test, y_train, y_test = train_test_split(
-        # df4, AL4, test_size=0.4, random_state=47)
+    # 60% of data for training, 40% of data held back for testing
+    X_train, X_test, y_train, y_test = train_test_split(
+        df_2003, discrete_AL, test_size=0.4, random_state=47)
 
     # ---------------------------------------------------------------
     # LINEAR REGRESSION
