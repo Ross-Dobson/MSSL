@@ -198,7 +198,7 @@ def main():
     # ---------------------------------------------------------------
     # GAUSSIAN NAIVE BAYES
     # create the Gaussian Naive Bayes object
-    gnb = GaussianNB()
+    # gnb = GaussianNB()
 
     # train it on the training data
     # gnb.fit(X_train, y_train)
@@ -211,34 +211,58 @@ def main():
     print("Accuracy: %0.2f (+/- %0.2f)" %
           (regr_scores.mean(), regr_scores.std() * 2))
 
-    gnb_scores = cross_val_score(gnb, df_2003, discrete_AL, cv=10)
-    print("The gaussian naive bayes CV scores are", gnb_scores)
-    print("Accuracy: %0.2f (+/- %0.2f)" %
-          (gnb_scores.mean(), gnb_scores.std() * 2))
-
-
-# TODO: SCALER/TRANSFORMING THE DATA
-# do we need to hold out data for this? something about in sklearn docs
-# but not sure if it applies to us. Doesn't actually change correlations
-# docs suggest using a Pipeline object to do all of this
 
 # TODO: REMOVING USELESS PARAMETERS
-# formally investigate mutual information?
-
-# TODO: TIMESHIFTING NaNs
-# is the best solution? Does this defeat point of timeshifting in first place?
+#  mutual info can also tell us something about "drivers"
 
 # TODO: CROSS VALIDATION
-# what k value to use?
-# what scoring paramemeter? default is whatever model default is
-# should i use cross_validate instead?
-
-# TODO: GAUSSIAN NAIVE BAYES
-# how do I deal with the value error? Doing astype(float) didnt help
-
-# TODO: LOGISTIC REGRESSION
-# can't get my head around the function - tried reading up on the different
-# parameters, particularly algorithms, penalties and behaviours etc but still
-# not entirely sure whats the best approach to implement this.
-# do I want the LogisticRegressionCV function?
+# If we have sufficient extreme data in each fold, we can reduce each fold
+# dependent on amount of data
+#
+# might be doing a good job predicting when "Nothing" is happening but not good
+# for predicitng extremes.
+# so test the model with another year's storm - use the NASA link?
+# visualisation - two lines - here's what data did, here's what model did
+# but not great as ony predicting one timestep ahead
+# instead: linegraph of AL over time. Pick out one point in the storm
+# "this is the solar wind input I'm providing". Then present entry X, answer Y
+# for a particular point in the storm. So feed in a datetime etc. Need to be
+# careful with shapes (.reshape()).
+# So, to start, plug in a storm from a different year, then plot real AL vs
+# predicted AL for that other year.
+#
+# OTHER METRICS
+# method 1: use another metric? R^2, mean square error, etc.
+# Dont imagine they give much difference...
+# Method 2: engineer your output - AL varies between +- 10~20 nanoTesla
+# but then drops to -100, -200. Engi the output to make it more sensitive
+# to extreme events. Take absolute, then take Log, which will scale the whole.
+# Might compress the metrics to either take more account, or neglect the
+# extremes. Eg ground mag field perturbation studies, takes the Log10
+# because by default it varies by 5 order of mag. Will ignore small stuff if
+# its not logged.
+# way to test this: feed in validation storm from another year, then have loads
+# of dashed lines from all the different ways of metrics, different models
+#
+# Summary so far:
+#
+# Feature selection - look at mutual information between aprameters
+# might pick up squared relationships etc
+# Metrics and outputs: ways to check they are doign what we think they are
+#
+# Extension:
+# another baseline model we want to compare to
+# first one: persistence models - if it does well, nothing reallys happening
+# and you model is not adding any value.
+# The way to code this is that your previous timestep is the answer to the next
+# Persistence models wont pick up any interesting events.
+# You can do this by shifting all the answers along by 1? Then compare
+# something like sum-of-squares by providing the 1-shift set as your answers
+# Ideally, we want to outperform our persistence model - or we're not doing
+# anything useful! A way of benchmarking the forecast.
+# Mean of previous day, 4hr rolling cyclical forecast various methods and cases
+# Solar physics often use ~24 days as sun spins every ~24d. So they wanna
+# beat that.
+#
+# Week centred on the storm would be a good predictor period.
 main()
