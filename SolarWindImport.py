@@ -211,7 +211,8 @@ def import_storm_week(year, month, day):
     """
 
     df_array = []
-    for i in range(month-1, month+1):
+    for i in range(month-1, month+2):
+        print("i plus one is", i+1)
         this_month_df = import_omni_month(year, (i+1))
         df_array.append(this_month_df)
 
