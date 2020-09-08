@@ -98,8 +98,8 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
                     days=int(row.Day) - 1)
                 + datetime.timedelta(seconds=row.Hour*60*60 + row.Minute*60),
                 axis=1)
-            
-        # a FileNotFoundError from pd.read_csv means we need to download the data
+
+        # FileNotFoundError from pd.read_csv means we need to download the data
         except FileNotFoundError:
 
             print('Local .asc not found -> '
@@ -243,8 +243,6 @@ def import_storm_week(year, month, day):
             this_month_df = import_omni_month(year, i)
 
         df_array.append(this_month_df)
-        print("SWI DEBUG 1:")
-        print(this_month_df)
 
     # concat the three months together into one df_2003
     storm_df = pd.concat(df_array)
@@ -259,9 +257,18 @@ def import_storm_week(year, month, day):
     storm_df = storm_df[(storm_df.DateTime >= start_dt)
                         & (storm_df.DateTime <= end_dt)]
 
-    print("SWI debug 2:")
-    print(storm_df)
     return storm_df
+
+
+def storm_interpolator(my_df):
+    """Straight-line interpolates gaps (NaNs) less than 15 minutes.
+    After that, it just removes any remaining NaNs inplace."""
+    df_resampled = my_df.resample(
+        '1T', loffset=datetime.timedelta(seconds=30.)).mean()
+    df_resampled = df_resampled.interpolate(method='linear', limit=15)
+    df_resampled.dropna(axis='index', how='any', inplace=True)
+
+    return df_resampled
 
 
 def main():
