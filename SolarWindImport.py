@@ -195,6 +195,44 @@ def import_omni_year(year):
 
     return year_df
 
+def import_storm_week(year, month, day):
+    """
+    Imports the week of data surrounding a storm.
+    Can deal with storms spanning month boundary as imports multiple months.
+
+    Args:
+        year: the year of the data to import
+        month: the month of the data to import
+
+    Returns:
+        data: a pandas DataFrame object.
+
+    Ross Dobson, September 2020
+    """
+
+    df_array = []
+    for i in range(month-1, month+1):
+        this_month_df = import_omni_month(year, (i+1))
+        df_array.append(this_month_df)
+
+    # concat the three months together into one df_2003
+    storm_df = pd.concat(df_array)
+
+    # storm datetime - START of storm
+    storm_dt = datetime.datetime(year, month, day)
+
+    # start datetime -3 days
+    start_dt = storm_dt - datetime.timedelta(days=3)
+
+    # end datetime +4 days
+    end_dt = storm_dt + datetime.timedelta(days=4)
+    # this way we get 3 days either side
+
+    storm_df = storm_df[(storm_df.DateTime >= start_dt)
+                        & (storm_df.DateTime <= end_dt)]
+
+    return storm_df
+
 
 def main():
     print("Don't execute this file. Import it and use its functions.")
