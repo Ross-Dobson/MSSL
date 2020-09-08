@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.naive_bayes import GaussianNB
 
-from SolarWindImport import import_omni_year, import_omni_month
+from SolarWindImport import import_omni_year, import_omni_month, import_storm_week, storm_interpolator
 
 
 def main():
@@ -124,21 +124,7 @@ def main():
     df_2003 = df_2003.drop(["n_p"], axis=1)
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
-    # resample the data into one minute chunks
-
-    # just a failsafe, ensure everything is 1 minutes apart
-    df_resampled = df_2003.resample(
-        '1T', loffset=datetime.timedelta(seconds=30.)).mean()
-    df_2003 = df_resampled.interpolate(method='linear', limit=15)
-    # I've tested, dropna does work. Can use np.isnan on each value to check
-
-    # ---------------------------------------------------------------
-    # REMOVING NaN VALUES
-    # go by rows, delete if ANY values are NaN, do this in same df
-    df_2003.dropna(axis='index', how='any', inplace=True)
-    # to check this has worked, notice the last 30 minutes on Dec 31 are gone.
-    # previously, these were riddled with NaNs.
-
+    df_2003 = storm_interpolator(df_2003)
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
 
@@ -152,7 +138,10 @@ def main():
 
     # ---------------------------------------------------------------
     # DISCRETIZE AL
+
+    # seperate AL from the main df
     df_AL = df_2003['AL'].copy()
+    df_2003 = df_2003.drop(["AL"], axis=1)
 
     # Roll right, 30 minutes.
     # E.g. 12:00-12:30 -> 12:30, 12:01-12:31 -> 12:31
@@ -175,7 +164,9 @@ def main():
 
     # Needs shape (n_samples, n_features)
     # Split the data into two parts, one for training and testing
+    print("\nPrepared DF 2003:")
     print(df_2003)
+    print("\nPrepared DF AL:")
     print(discrete_AL)
 
     # 60% of data for training, 40% of data held back for testing
@@ -192,28 +183,113 @@ def main():
     regr.fit(X_train, y_train)
 
     # ---------------------------------------------------------------
-    # LOGISTIC REGRESSION
-    # :thonk:
-
-    # ---------------------------------------------------------------
-    # GAUSSIAN NAIVE BAYES
-    # create the Gaussian Naive Bayes object
-    # gnb = GaussianNB()
-
-    # train it on the training data
-    # gnb.fit(X_train, y_train)
-
-    # ---------------------------------------------------------------
     # CROSS VALIDATION
     # using 10 folds
     regr_scores = cross_val_score(regr, df_2003, discrete_AL, cv=10)
-    print("The linear regression CV scores are", regr_scores)
-    print("Accuracy: %0.2f (+/- %0.2f)" %
+    print("\nThe linear regression CV scores are", regr_scores)
+    print("\nAccuracy: %0.2f (+/- %0.2f)" %
           (regr_scores.mean(), regr_scores.std() * 2))
 
+    # ***************************************************************
+    # ***************************************************************
+    # IMPORTING THE TEST STORMS, AND PREPARING THE DATA
+    # ***************************************************************
+    # ***************************************************************
 
+    # ---------------------------------------------------------------
+    # IMPORT TEST STORMS
+    # from doi:10.1002/swe.20056
+
+    # DONT USE STORM 1 as its in the 2003 model training data!
+    # storm_1 = import_storm_week(2003, 10, 29)
+    storm_2 = import_storm_week(2006, 12, 14)
+    storm_3 = import_storm_week(2001, 8, 31)
+    storm_4 = import_storm_week(2005, 8, 31)
+    storm_5 = import_storm_week(2010, 4, 5)
+    storm_6 = import_storm_week(2011, 8, 5)
+
+    storm_array = [storm_2, storm_3, storm_4, storm_5, storm_6]
+
+    storm_str_array=["2006-12-14 to 2006-12-16",
+                     "2001-08-31 to 2001-09-01",
+                     "2005-08-31 to 2005-09-01",
+                     "2010-04-05 to 2010-04-06",
+                     "2011-08-05 to 2011-08-06"]
+
+    # ---------------------------------------------------------------
+    # STANDARD SCALING
+
+    # The features we care about
+    model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
+
+    X_array = []
+    y_array = []
+    for i, storm in enumerate(storm_array):
+        storm_index = storm.index
+        X = storm[model_vals]
+        y = storm['AL']
+
+        # scale the main features
+        X_trans = scaler.transform(X)
+
+        # need to add it back into a DF
+        X_array.append(pd.DataFrame(X_trans,
+                                    columns=df_2003_cols, index=storm_index))
+
+        # scale AL
+        y = y.to_numpy()
+        y = y.reshape(-1, 1)
+        y_trans = scaler2.transform(y)
+
+        # need to add it back into a DF
+        y_array.append(pd.DataFrame(y_trans,
+                                    columns=['AL'], index=storm_index))
+
+    # ---------------------------------------------------------------
+    # DROPPING USELESS PARAMETERS
+    # removing n_p - in the words of Mayur
+    # "by far weakest correlation with AL and a strong correlation with P"
+    for i, X in enumerate(X_array):
+        X_array[i] = X.drop(["n_p"], axis=1)
+
+    # ---------------------------------------------------------------
+    # INTERPOLATE AND DROPNA IN THE TEST STORMS
+    # have to add AL back in so that the dropped datetimes are consistent!
+    
+    interpolated_array = []
+    index_array = []  # each storm will drop seperate dt, need to store indexes
+
+    for i, X in enumerate(X_array):
+        X.insert(4, "AL", y_array[i])  # add AL back in
+
+        # interpolate the storm - pars AND AL in one go
+        interpolated_array.append(storm_interpolator(X))
+
+        # store the new index for this storm, for later
+        index_array.append(interpolated_array[i].index)
+
+    # seperate AL back out again!
+    for i, storm in enumerate(interpolated_array):
+        X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
+        y_array[i] = storm["AL"]
+
+    # ---------------------------------------------------------------
+    # PREDICTING THE DATA
+    y_pred_array = []
+    for X in X_array:
+        y_pred_array.append(regr.predict(X))
+
+    print(index_array[0])
+    for i in range(0, len(y_array)):
+        plt.figure()
+        plt.title("Storm from " + storm_str_array[i])
+        plt.plot(index_array[i], y_pred_array[i], label="Predicted AL")
+        plt.plot(index_array[i], y_array[i], label="Actual AL")
+        plt.legend(loc='best')
+
+# 2020-09-01 meeting
 # TODO: REMOVING USELESS PARAMETERS
-#  mutual info can also tell us something about "drivers"
+# mutual info can also tell us something about "drivers"
 
 # TODO: CROSS VALIDATION
 # If we have sufficient extreme data in each fold, we can reduce each fold
@@ -265,4 +341,28 @@ def main():
 # beat that.
 #
 # Week centred on the storm would be a good predictor period.
+#
+# MEETING Notes 2020-09-08
+# model is a linear reg. Good benchmark. Simple model, we can compare to easily
+# anny more complicated model SHOULD beat this. If we dont beat it, then
+# something has gone wrong, or its topo complicated and confusing itself
+# whatever metric we compare, keep it stored and compare later on with neural
+# nets. So, if we use mean squared or whatever metric.
+# So, this week, get metrics out, that'd be nice.
+# ALSO, persistence model. "we have complicated model, but it beats linreg AND
+# persistence", thats a good justification.
+# evaluate during the storms intervals. Thats the time thats really critical.
+# else its just boring times. persistence will do really well, as nothing is
+# changing. But storm is the time we really should see improvement.
+# Also, mutual inforation, which is more important for NN as limiting the
+# inputs saves a LOTTTTT of time training, and perhaps even better results.
+# sklearn mutual info score.
+# persistence model:
+# undo the shift, keep the rolling minimum, so its off to the right?
+# LONG TERM STRETCH GOAL
+# look into artifical neural networks. Recurrent are also good for time series
+# forecast. but ANNs are good starting point. LSTMs are an example of recurrent
+# neural network, with a "forget" function. Quicker than normal RNN.
+
+
 main()
