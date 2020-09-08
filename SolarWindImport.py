@@ -60,46 +60,65 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
                    'AsyH', 'PCN', 'MagnetosonicMach', '10MeVProton',
                    '30MeVProton', '60MeVProton']
 
-    # Check if already downloaded because these files are big
-    asc_dir = pathlib.Path('Data/OMNI/asc/')
-    asc_fname = 'OMNI_1min_' + year_str + month_str + '.asc'
-    asc_path = asc_dir / asc_fname
+    # Use pickles, MUCH faster than the .asc files
+    pkl_dir = pathlib.Path('Data/OMNI/pickles')
 
+    mon_str = str(month)
+    if (month < 10):
+        mon_str = '0' + str(month)
+
+    pkl_fname = str(year) + mon_str + '.pkl'
+    pkl_path = pkl_dir / pkl_fname
+
+    # Look for the pickle
     try:
-        # headers are NOT stored in the NASA asc data files, so header=None
-        # instead, manually passed in via 'names'. Not ideal, but it works...
-        data = pd.read_csv(asc_path, sep='\s+', names=omni_header, header=None)
-        print('Local data found at', asc_path)
+        data = pd.read_pickle(pkl_path)
+        print("Pickle found:", pkl_fname)
 
-        # not entirely sure what this is doing - just generating the
-        # column of datetimes to use as the index?
-        data['DateTime'] = data.apply(
-            lambda row:
-            datetime.datetime(int(row.Year), 1, 1)
-            + datetime.timedelta(
-                days=int(row.Day) - 1)
-            + datetime.timedelta(seconds=row.Hour*60*60 + row.Minute*60),
-            axis=1)
-
-    # a FileNotFoundError from pd.read_csv means we need to download the data
     except FileNotFoundError:
+        print("Pickle not found. Looking for local .asc files to create it.")
 
-        print('Local data not found -> '
-              + 'downloading from https://spdf.sci.gsfc.nasa.gov')
-        asc_url = ('https://spdf.sci.gsfc.nasa.gov/pub/data/omni/'
-                   + 'high_res_omni/monthly_1min/omni_min'
-                   + year_str + month_str + '.asc')
+        # Check if already downloaded because these files are big
+        asc_dir = pathlib.Path('Data/OMNI/asc/')
+        asc_fname = 'OMNI_1min_' + year_str + month_str + '.asc'
+        asc_path = asc_dir / asc_fname
+        try:
+            # headers are NOT stored in the NASA asc data files, so header=None
+            # instead, manually passed in via 'names'. Not ideal, but it works
+            data = pd.read_csv(asc_path, sep='\s+',
+                               names=omni_header, header=None)
+            print('Local data found at', asc_path)
 
-        print('Creating local directory at ', asc_dir,
-              ' (if it doesn\'t already exist)')
-        pathlib.Path(asc_dir).mkdir(exist_ok=True)
+            # not entirely sure what this is doing - just generating the
+            # column of datetimes to use as the index?
+            data['DateTime'] = data.apply(
+                lambda row:
+                datetime.datetime(int(row.Year), 1, 1)
+                + datetime.timedelta(
+                    days=int(row.Day) - 1)
+                + datetime.timedelta(seconds=row.Hour*60*60 + row.Minute*60),
+                axis=1)
+            
+        # a FileNotFoundError from pd.read_csv means we need to download the data
+        except FileNotFoundError:
 
-        print('Done. Downloading data to: ', asc_path)
-        urllib.request.urlretrieve(asc_url, asc_path)  # Saves to asc_path
-        print('Data downloaded.')
+            print('Local .asc not found -> '
+                  + 'downloading from https://spdf.sci.gsfc.nasa.gov')
+            asc_url = ('https://spdf.sci.gsfc.nasa.gov/pub/data/omni/'
+                       + 'high_res_omni/monthly_1min/omni_min'
+                       + year_str + month_str + '.asc')
 
-        # again, headers NOT in data, passed in via 'names' parameter instead
-        data = pd.read_csv(asc_path, sep='\s+', names=omni_header, header=None)
+            print('Creating local directory at ', asc_dir,
+                  ' (if it doesn\'t already exist)')
+            pathlib.Path(asc_dir).mkdir(exist_ok=True)
+
+            print('Done. Downloading data to: ', asc_path)
+            urllib.request.urlretrieve(asc_url, asc_path)  # Saves to asc_path
+            print('Data downloaded.')
+
+        # headers NOT in data, passed in via 'names' parameter instead
+        data = pd.read_csv(asc_path, sep='\s+',
+                           names=omni_header, header=None)
 
         # same as above, think it just generates datetimes
         data['DateTime'] = data.apply(
@@ -109,24 +128,27 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
             + datetime.timedelta(seconds=row.Hour*60*60+row.Minute*60),
             axis=1)
 
-    # Select the data within our time range
-    data = data[(data.DateTime >= start_datetime)
-                & (data.DateTime <= end_datetime)]
+        # Select the data within our time range
+        data = data[(data.DateTime >= start_datetime)
+                    & (data.DateTime <= end_datetime)]
 
-    # Bodge broken data with NaN, easier to interpolate later, pd is happier
-    data = data.replace(99.99, np.nan)
-    data = data.replace(999.9, np.nan)
-    data = data.replace(999.99, np.nan)
-    data = data.replace(9999.99, np.nan)
-    data = data.replace(99999.9, np.nan)
-    data = data.replace(9999999., np.nan)
+        # Bodge broken data with NaN, easier to interpolate, pd is happier
+        data = data.replace(99.99, np.nan)
+        data = data.replace(999.9, np.nan)
+        data = data.replace(999.99, np.nan)
+        data = data.replace(9999.99, np.nan)
+        data = data.replace(99999.9, np.nan)
+        data = data.replace(9999999., np.nan)
 
-    # Make DateTime the index of the dataframe - ie the row labels
-    data.index = data['DateTime']
+        # Make DateTime the index of the dataframe - ie the row labels
+        data.index = data['DateTime']
 
-    # In case we only wanted specific columns
-    if cols != 'All':
-        data = data[cols]
+        # In case we only wanted specific columns
+        if cols != 'All':
+            data = data[cols]
+
+        # store as pickle - MUCH faster loading, saves us doing this again
+        data.to_pickle(pkl_path)
 
     return data
 
@@ -195,6 +217,7 @@ def import_omni_year(year):
 
     return year_df
 
+
 def import_storm_week(year, month, day):
     """
     Imports the week of data surrounding a storm.
@@ -212,7 +235,6 @@ def import_storm_week(year, month, day):
 
     df_array = []
     for i in range(month-1, month+2):
-        print("i, the month value, is", i)
         if (i == 13):
             this_month_df = import_omni_month(year+1, 1)
         elif (i == 0):
@@ -221,23 +243,24 @@ def import_storm_week(year, month, day):
             this_month_df = import_omni_month(year, i)
 
         df_array.append(this_month_df)
+        print("SWI DEBUG 1:")
+        print(this_month_df)
 
     # concat the three months together into one df_2003
     storm_df = pd.concat(df_array)
 
     # storm datetime - START of storm
     storm_dt = datetime.datetime(year, month, day)
-
     # start datetime -3 days
     start_dt = storm_dt - datetime.timedelta(days=3)
-
     # end datetime +4 days
     end_dt = storm_dt + datetime.timedelta(days=4)
     # this way we get 3 days either side
-
     storm_df = storm_df[(storm_df.DateTime >= start_dt)
                         & (storm_df.DateTime <= end_dt)]
 
+    print("SWI debug 2:")
+    print(storm_df)
     return storm_df
 
 
