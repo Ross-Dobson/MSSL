@@ -212,8 +212,14 @@ def import_storm_week(year, month, day):
 
     df_array = []
     for i in range(month-1, month+2):
-        print("i plus one is", i+1)
-        this_month_df = import_omni_month(year, (i+1))
+        print("i, the month value, is", i)
+        if (i == 13):
+            this_month_df = import_omni_month(year+1, 1)
+        elif (i == 0):
+            this_month_df = import_omni_month(year-1, 12)
+        else:
+            this_month_df = import_omni_month(year, i)
+
         df_array.append(this_month_df)
 
     # concat the three months together into one df_2003
