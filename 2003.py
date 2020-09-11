@@ -147,11 +147,15 @@ def main():
     # E.g. 12:00-12:30 -> 12:30, 12:01-12:31 -> 12:31
     discrete_AL = df_AL.rolling(30).min()
 
+    # create a copy before shifting - this is for persistence model later
+    pers_AL = discrete_AL.copy()
+    pers_2003 = df_2003.copy()
+
     # now, because this isn't a native argument, we roll left by shifting
     discrete_AL = discrete_AL.shift(-30)
 
     # ---------------------------------------------------------------
-    # TEMPORARY SOLUTION TO NAN ISSUES FROM TIMESHIFTING
+    # SOLUTION TO NAN ISSUES FROM TIMESHIFTING
 
     # drop the nans in the last 30 elements of the discretized AL
     discrete_AL.dropna(axis='index', how='any', inplace=True)
@@ -159,6 +163,14 @@ def main():
     # now, drop the last 30 minutes of all the other data so shapes stay equal
     df_2003.drop(df_2003.tail(30).index, inplace=True)
 
+    # for the persistence model, we do the same, but with the head
+    pers_AL.dropna(axis='index', how='any', inplace=True)
+    pers_2003.drop(pers_2003.head(29).index, inplace=True)  # dont ask why 29
+
+    print("DEBUG pers AL")
+    print(pers_AL)
+    print("DEBUG pers 2003")
+    print(pers_2003)
     # ---------------------------------------------------------------
     # TRAIN TEST SPLIT
 
@@ -184,7 +196,6 @@ def main():
 
     # ---------------------------------------------------------------
     # CROSS VALIDATION
-    # using 10 folds
     regr_scores = cross_val_score(regr, df_2003, discrete_AL, cv=10)
     print("\nThe linear regression CV scores are", regr_scores)
     print("\nAccuracy: %0.2f (+/- %0.2f)" %
@@ -210,11 +221,11 @@ def main():
 
     storm_array = [storm_2, storm_3, storm_4, storm_5, storm_6]
 
-    storm_str_array=["2006-12-14 to 2006-12-16",
-                     "2001-08-31 to 2001-09-01",
-                     "2005-08-31 to 2005-09-01",
-                     "2010-04-05 to 2010-04-06",
-                     "2011-08-05 to 2011-08-06"]
+    storm_str_array = ["2006-12-14 to 2006-12-16",
+                       "2001-08-31 to 2001-09-01",
+                       "2005-08-31 to 2005-09-01",
+                       "2010-04-05 to 2010-04-06",
+                       "2011-08-05 to 2011-08-06"]
 
     # ---------------------------------------------------------------
     # STANDARD SCALING
@@ -255,7 +266,7 @@ def main():
     # ---------------------------------------------------------------
     # INTERPOLATE AND DROPNA IN THE TEST STORMS
     # have to add AL back in so that the dropped datetimes are consistent!
-    
+
     interpolated_array = []
     index_array = []  # each storm will drop seperate dt, need to store indexes
 
@@ -279,14 +290,130 @@ def main():
     for X in X_array:
         y_pred_array.append(regr.predict(X))
 
-    print(index_array[0])
+    # ---------------------------------------------------------------
+    # PLOTTING PREDICTED VS REAL (DISCRETIZED) AL
+
+    # # Plot the predicted data vs our discretized AL
+    # for i in range(0, len(y_array)):
+    #     plt.figure()
+    #     plt.title("Storm from " + storm_str_array[i])
+    #     plt.plot(index_array[i], y_pred_array[i], label="Predicted AL")
+    #     plt.plot(index_array[i], y_array[i], label="Actual AL")
+    #     plt.legend(loc='best')
+
+    # ***************************************************************
+    # ***************************************************************
+    # PERSISTENCE MODEL
+    # ***************************************************************
+    # ***************************************************************
+
+    # ---------------------------------------------------------------
+    # TRAIN TEST SPLIT
+
+    # Needs shape (n_samples, n_features)
+    # Split the data into two parts, one for training and testing
+    print("\nPrepared persistence DF 2003:")
+    print(pers_2003)
+    print("\nPrepared persistence DF AL:")
+    print(pers_AL)
+
+    # 60% of data for training, 40% of data held back for testing
+    # using 47 as seed for repeatbility (its 42 rounded for inflation :P)
+    X_train, X_test, y_train, y_test = train_test_split(
+        pers_2003, pers_AL, test_size=0.4, random_state=47)
+
+    # ---------------------------------------------------------------
+    # LINEAR REGRESSION
+    # create the linear regression object
+    pers_regr = LinearRegression()
+
+    # train it on the training data
+    pers_regr.fit(X_train, y_train)
+
+    # ---------------------------------------------------------------
+    # CROSS VALIDATION
+    pers_regr_scores = cross_val_score(pers_regr, pers_2003, pers_AL, cv=10)
+    print("\nThe persistence linear regression CV scores:", pers_regr_scores)
+    print("\nAccuracy: %0.2f (+/- %0.2f)" %
+          (pers_regr_scores.mean(), pers_regr_scores.std() * 2))
+
+    # ---------------------------------------------------------------
+    # STANDARD SCALING
+    # storm_array has been untouched, its literally just the raw data
+    # reusing it means no having to load in a few hundred mb of pickles again
+
+    # The features we care about
+    model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
+
+    X_array = []
+    y_array = []
+    for i, storm in enumerate(storm_array):
+        storm_index = storm.index
+        X = storm[model_vals]
+        y = storm['AL']
+
+        # scale the main features
+        X_trans = scaler.transform(X)
+
+        # need to add it back into a DF
+        X_array.append(pd.DataFrame(X_trans,
+                                    columns=df_2003_cols, index=storm_index))
+
+        # scale AL
+        y = y.to_numpy()
+        y = y.reshape(-1, 1)
+        y_trans = scaler2.transform(y)
+
+        # need to add it back into a DF
+        y_array.append(pd.DataFrame(y_trans,
+                                    columns=['AL'], index=storm_index))
+
+    # ---------------------------------------------------------------
+    # DROPPING USELESS PARAMETERS
+    # removing n_p - in the words of Mayur
+    # "by far weakest correlation with AL and a strong correlation with P"
+    for i, X in enumerate(X_array):
+        X_array[i] = X.drop(["n_p"], axis=1)
+
+    # ---------------------------------------------------------------
+    # INTERPOLATE AND DROPNA IN THE TEST STORMS
+    # have to add AL back in so that the dropped datetimes are consistent!
+
+    interpolated_array = []
+    index_array = []  # each storm will drop seperate dt, need to store indexes
+
+    for i, X in enumerate(X_array):
+        X.insert(4, "AL", y_array[i])  # add AL back in
+
+        # interpolate the storm - pars AND AL in one go
+        interpolated_array.append(storm_interpolator(X))
+
+        # store the new index for this storm, for later
+        index_array.append(interpolated_array[i].index)
+
+    # seperate AL back out again!
+    for i, storm in enumerate(interpolated_array):
+        X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
+        y_array[i] = storm["AL"]
+
+    # ---------------------------------------------------------------
+    # PREDICTING THE DATA
+    y_pred_array = []
+    for X in X_array:
+        y_pred_array.append(pers_regr.predict(X))
+
+    # ---------------------------------------------------------------
+    # PLOTTING PREDICTED VS PERSISTENCE (DISCRETIZED) AL
+
+    # Plot the predicted data vs our persistence AL
     for i in range(0, len(y_array)):
         plt.figure()
         plt.title("Storm from " + storm_str_array[i])
         plt.plot(index_array[i], y_pred_array[i], label="Predicted AL")
-        plt.plot(index_array[i], y_array[i], label="Actual AL")
+        plt.plot(index_array[i], y_array[i], label="Persistence AL")
         plt.legend(loc='best')
 
+    
 # 2020-09-01 meeting
 # TODO: REMOVING USELESS PARAMETERS
 # mutual info can also tell us something about "drivers"
