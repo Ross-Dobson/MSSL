@@ -56,12 +56,13 @@ def main():
     # PLOTTING THE PARAMETERS
 
     plot_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'AL', 'P', 'V']
-    # for val in plot_vals:
-    #     year_title = str(val) + ' in ' + str(year)
-    #     df_2003.plot(x='DateTime', y=val, title=year_title)
 
-    #     oct_nov_title = str(val) + ' in October and November 2003'
-    #     df_oct_nov_2003.plot(x='DateTime', y=val, title=oct_nov_title)
+    # for val in plot_vals:
+        # year_title = str(val) + ' in ' + str(year)
+        # data_2003.plot(x='DateTime', y=val, title=year_title)
+
+        # oct_nov_title = str(val) + ' in October and November 2003'
+        # df_oct_nov_2003.plot(x='DateTime', y=val, title=oct_nov_title)
 
     # ---------------------------------------------------------------
     # CORRELATION MATRIX BEFORE SCALER
@@ -412,15 +413,15 @@ def main():
     # ---------------------------------------------------------------
     # PLOTTING PREDICTED VS PERSISTENCE (DISCRETIZED) AL
 
-    # Plot the predicted data vs our persistence AL
-    # for i in range(0, len(pers_y_array)):
-    #     plt.figure()
-    #     plt.title("Storm from " + storm_str_array[i])
-    #     plt.plot(pers_index_array[i], pers_y_pred_array[i],
-    #              label="Persistence Predicted AL")
-    #     plt.plot(pers_index_array[i], pers_y_array[i],
-    #              label="Persistence True AL")
-    #     plt.legend(loc='best')
+    Plot the predicted data vs our persistence AL
+    for i in range(0, len(pers_y_array)):
+        plt.figure()
+        plt.title("Storm from " + storm_str_array[i])
+        plt.plot(pers_index_array[i], pers_y_pred_array[i],
+                 label="Persistence Predicted AL")
+        plt.plot(pers_index_array[i], pers_y_array[i],
+                 label="Persistence True AL")
+        plt.legend(loc='best')
 
     # ***************************************************************
     # ***************************************************************
@@ -567,6 +568,25 @@ def main():
 # look into artifical neural networks. Recurrent are also good for time series
 # forecast. but ANNs are good starting point. LSTMs are an example of recurrent
 # neural network, with a "forget" function. Quicker than normal RNN.
+
+# meeting notes 15th
+# first array are the unshifted AL values 0 to 30
+# second array is the shifted persistence AL
+#
+# mutual info:
+# start with, feed in density and pressure (np and p) - they should be related
+# mutual_info_regression: do the feature array vs AL
+# and each feature vs feature
+#
+# checking parameters that are more easily predicted eg solar wind speed
+# rather than just using the L1 data that we are using currently
+# buuuuut this is more something for the discussion
+#
+# svr - random forest regressor
+# good idea - random forest, do a graph: x is no features, y is any old metric
+# then pick the highest score. GOod way to investigate features
+#
+# stretch goal: shorter time period - (12h either side)? desirable in future
 
 
 main()
