@@ -96,7 +96,7 @@ def main():
     # need to add it back into a DF
     df_2003 = pd.DataFrame(arr_2003_scaled,
                            columns=df_2003_cols, index=df_2003_index)
-    print("\n2003 data has been scaled.\n")
+    print("2003 data has been scaled.")
     # print(df_2003)
 
     # scale AL
@@ -130,6 +130,8 @@ def main():
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     df_2003 = storm_interpolator(df_2003)
+
+    print("2003 data interpolated.")
 
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
@@ -173,16 +175,11 @@ def main():
     pers_AL.dropna(axis='index', how='any', inplace=True)
     pers_2003.drop(pers_2003.head(29).index, inplace=True)  # dont ask why 29
 
-    
     # ---------------------------------------------------------------
     # TRAIN TEST SPLIT
 
     # Needs shape (n_samples, n_features)
     # Split the data into two parts, one for training and testing
-    print("\nPrepared DF 2003:")
-    print(df_2003)
-    print("\nPrepared DF AL:")
-    print(discrete_AL)
 
     # 60% of data for training, 40% of data held back for testing
     # using 47 as seed for repeatbility (its 42 rounded for inflation :P)
@@ -200,8 +197,8 @@ def main():
     # ---------------------------------------------------------------
     # CROSS VALIDATION
     regr_scores = cross_val_score(regr, df_2003, discrete_AL, cv=10)
-    print("\nThe linear regression CV scores are", regr_scores)
-    print("\nAccuracy: %0.2f (+/- %0.2f)" %
+    print("The linear regression CV scores are", regr_scores)
+    print("Accuracy: %0.2f (+/- %0.2f)" %
           (regr_scores.mean(), regr_scores.std() * 2))
 
     # ***************************************************************
@@ -291,6 +288,7 @@ def main():
         X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
         y_array[i] = storm["AL"]
 
+    print("Test storms interpolated.")
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
     y_pred_array = []
@@ -308,9 +306,6 @@ def main():
     #     plt.plot(index_array[i], y_array[i], label="Actual AL")
     #     plt.legend(loc='best')
 
-    # ---------------------------------------------------------------
-    # REGRESSION METRICS
-
     # ***************************************************************
     # ***************************************************************
     # PERSISTENCE MODEL
@@ -322,11 +317,6 @@ def main():
 
     # Needs shape (n_samples, n_features)
     # Split the data into two parts, one for training and testing
-    print("Prepared persistence DF 2003:")
-    print(pers_2003)
-    print("Prepared persistence DF AL:")
-    print(pers_AL)
-
     # 60% of data for training, 40% of data held back for testing
     # using 47 as seed for repeatbility (its 42 rounded for inflation :P)
     pers_X_train, pers_X_test, pers_y_train, pers_y_test = train_test_split(
@@ -410,6 +400,7 @@ def main():
         pers_X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
         pers_y_array[i] = storm["AL"]
 
+    print("Persistence model test storms interpolated.")
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
 
@@ -422,59 +413,83 @@ def main():
     # PLOTTING PREDICTED VS PERSISTENCE (DISCRETIZED) AL
 
     # Plot the predicted data vs our persistence AL
-    for i in range(0, len(pers_y_array)):
-        plt.figure()
-        plt.title("Storm from " + storm_str_array[i])
-        plt.plot(pers_index_array[i], pers_y_pred_array[i],
-                 label="Persistence Predicted AL")
-        plt.plot(pers_index_array[i], pers_y_array[i],
-                 label="Persistence True AL")
-        plt.legend(loc='best')
+    # for i in range(0, len(pers_y_array)):
+    #     plt.figure()
+    #     plt.title("Storm from " + storm_str_array[i])
+    #     plt.plot(pers_index_array[i], pers_y_pred_array[i],
+    #              label="Persistence Predicted AL")
+    #     plt.plot(pers_index_array[i], pers_y_array[i],
+    #              label="Persistence True AL")
+    #     plt.legend(loc='best')
 
     # ***************************************************************
     # ***************************************************************
     # METRICS
     # ***************************************************************
     # ***************************************************************
-    
+
     # # ---------------------------------------------------------------
 
-    # def storm_metrics(y_true, y_pers, y_pred):
-    #     """Runs various regression metrics from sklearn.metrics"""
-    #     print("Explained variance score (higher is better, best 1.0):")
-    #     print("Discretized AL:", explained_variance_score(y_true, y_pred))
-    #     print("Persistence AL:", explained_variance_score(y_pers, y_pred))
+    def storm_metrics(strs, y_true, y_pred, pers_true, pers_pred):
+        """
+        Runs various regression metrics from sklearn.metrics
+        """
 
-    #     print("Max error (lower is better). Only one point, unsure if useful.")
-    #     print("Discretized AL:", max_error(y_true, y_pred))
-    #     print("Persistence AL:", max_error(y_pers, y_pred))
+        for i in range(0, len(strs)):
 
-    #     print("Mean absolute error (lower is better, best 0.0):")
-    #     print("Discretized AL:", mean_absolute_error(y_true, y_pred))
-    #     print("Persistence AL:", mean_absolute_error(y_pers, y_pred))
+            print("\nSTORM:", strs[i], "\n")
 
-    #     print("Mean squared error (lower is better, best 0.0):")
-    #     print("Discretized AL:", mean_squared_error(y_true, y_pred))
-    #     print("Persistence AL:", mean_squared_error(y_pers, y_pred))
+            print("\nExplained variance score (higher is better, best 1.0):")
+            print("Discretized AL:", explained_variance_score(
+                y_true[i], y_pred[i]))
+            print("Persistence AL:",
+                  explained_variance_score(pers_true[i], pers_pred[i]))
 
-    #     # this penalizes underpreciction more than overprediction
-    #     # Mean squared logarithmic error (lower is better, best 0.0)
-    #     # Penalizes underpreciction better. Good for exponential growth.
-    #     # Unsure of usefulness here."
-    #     print("Discretized AL:", mean_squared_log_error(y_true, y_pred))
-    #     print("Persistence AL:", mean_squared_log_error(y_pers, y_pred))
+            # Only one datum used. Not sure this is at all useful tbh.
+            print("\nMax error (lower is better).")
+            print("Discretized AL:", max_error(y_true[i], y_pred[i]))
+            print("Persistence AL:", max_error(pers_true[i], pers_pred[i]))
 
-    #     # not too affected by outliers - good choice of metric?
-    #     print("Median absolute error (lower is better, best 0.0):")
-    #     print("Discretized AL:", median_absolute_error(y_true, y_pred))
-    #     print("Persistence AL:", median_absolute_error(y_pers, y_pred))
+            print("\nMean absolute error (lower is better, best 0.0):")
+            print("Discretized AL:", mean_absolute_error(y_true[i], y_pred[i]))
+            print("Persistence AL:", mean_absolute_error(
+                pers_true[i], pers_pred[i]))
 
-    #     # variance is dependent on dataset, might be a pitfall
-    #     print("R^2 coefficient of determination:")
-    #     print("Discretized AL:", r2_score(y_true, y_pred))
-    #     print("Persistence AL:", r2_score(y_pers, y_pred))
+            print("\nMean squared error (lower is better, best 0.0):")
+            print("Discretized AL:", mean_squared_error(y_true[i], y_pred[i]))
+            print("Persistence AL:", mean_squared_error(
+                pers_true[i], pers_pred[i]))
 
-    #     # worth investigation mean_tweedie_deviance?
+            # this penalizes underpreciction more than overprediction
+            # Mean squared logarithmic error (lower is better, best 0.0)
+            # Penalizes underpreciction better. Good for exponential growth.
+            # Unsure of usefulness here."
+            # print("Discretized AL:", mean_squared_log_error(
+            #     y_true[i], y_pred[i]))
+            # print("Persistence AL:", mean_squared_log_error(
+            #     pers_true[i], pers_pred[i]))
+
+            # not too affected by outliers - good choice of metric?
+            print("\nMedian absolute error (lower is better, best 0.0):")
+            print("Discretized AL:", median_absolute_error(
+                y_true[i], y_pred[i]))
+            print("Persistence AL:", median_absolute_error(
+                pers_true[i], pers_pred[i]))
+
+            # variance is dependent on dataset, might be a pitfall
+            print("\nR2 coefficient of determination (higher=better), best 1)")
+            print("Discretized AL:", r2_score(y_true[i], y_pred[i]))
+            print("Persistence AL:", r2_score(pers_true[i], pers_pred[i]))
+
+    storm_metrics(storm_str_array,
+                  y_array, y_pred_array, pers_y_array, pers_y_pred_array)
+
+    # worth investigation mean_tweedie_deviance?
+    print("\n---\n")
+    print("Is it worth investigating mean_tweedie_deviance?")
+    print("Mean Square Log - check what Andy said about abs-logging")
+    print("all our values? (MSL wont run due to negative numbers)")
+            
 
 # 2020-09-01 meeting
 # TODO: REMOVING USELESS PARAMETERS
