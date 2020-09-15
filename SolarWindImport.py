@@ -197,7 +197,7 @@ def import_omni_year(year):
     # Look for the pickle
     try:
         year_df = pd.read_pickle(pkl_path)
-        print("Pickle found for", year)
+        print("Pickle found:", pkl_fname)
 
     except FileNotFoundError:
         print("Pickle not found. Looking for local .asc files to create it.")
