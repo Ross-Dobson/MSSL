@@ -9,6 +9,7 @@ from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import explained_variance_score, max_error, mean_absolute_error, mean_squared_error, mean_squared_log_error, median_absolute_error, r2_score
 
 from SolarWindImport import import_omni_year, import_omni_month, import_storm_week, storm_interpolator
 
@@ -65,9 +66,9 @@ def main():
     # ---------------------------------------------------------------
     # CORRELATION MATRIX BEFORE SCALER
 
-    print("\nCorrelation matrix before standardization:\n")
-    corr_2003 = data_2003[plot_vals].corr()
-    print(corr_2003)
+    # print("\nCorrelation matrix before standardization:\n")
+    # corr_2003 = data_2003[plot_vals].corr()
+    # print(corr_2003)
 
     # print("\nCorrelation matrix for October & November 2003\n")
     # corr_oct_nov_2003 = df_oct_nov_2003[plot_vals].corr()
@@ -85,7 +86,7 @@ def main():
     df_2003_index = df_2003.index  # row labels
 
     df_AL = data_2003['AL']
-    df_AL_index = df_AL.index  # should be same as df anyway, just datetimes
+    df_AL_index = df_AL.index  # get the index (row labels), they are datetimes
 
     # scale the main features
     scaler = StandardScaler()
@@ -95,7 +96,7 @@ def main():
     # need to add it back into a DF
     df_2003 = pd.DataFrame(arr_2003_scaled,
                            columns=df_2003_cols, index=df_2003_index)
-    # print("\nDF 2003 after scaling:\n")
+    print("\n2003 data has been scaled.\n")
     # print(df_2003)
 
     # scale AL
@@ -110,11 +111,14 @@ def main():
     # print("\nAL after scaling\n")
     # print(df_AL)
 
+    # Add AL back in to the df
+    df_2003.insert(4, "AL", arr_AL_scaled)
+
     # ---------------------------------------------------------------
     # CORR AFTER STANDARDISATION
-    df_2003.insert(4, "AL", arr_AL_scaled)
-    print("\nCorr after standardization:\n")
-    print(df_2003.corr())
+
+    # print("\nCorr after standardization:\n")
+    # print(df_2003.corr())
 
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
@@ -122,9 +126,11 @@ def main():
     # removing n_p - in the words of Mayur
     # "by far weakest correlation with AL and a strong correlation with P"
     df_2003 = df_2003.drop(["n_p"], axis=1)
+
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     df_2003 = storm_interpolator(df_2003)
+
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
 
@@ -167,10 +173,7 @@ def main():
     pers_AL.dropna(axis='index', how='any', inplace=True)
     pers_2003.drop(pers_2003.head(29).index, inplace=True)  # dont ask why 29
 
-    print("DEBUG pers AL")
-    print(pers_AL)
-    print("DEBUG pers 2003")
-    print(pers_2003)
+    
     # ---------------------------------------------------------------
     # TRAIN TEST SPLIT
 
@@ -227,8 +230,12 @@ def main():
                        "2010-04-05 to 2010-04-06",
                        "2011-08-05 to 2011-08-06"]
 
+    print("Test storms imported successfully.")
+
     # ---------------------------------------------------------------
     # STANDARD SCALING
+    # we use the same scalers we used earlier. Remember, "scaler" for features
+    # and "scaler2" for AL
 
     # The features we care about
     model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
@@ -236,7 +243,7 @@ def main():
     X_array = []
     y_array = []
     for i, storm in enumerate(storm_array):
-        storm_index = storm.index
+        storm_index = storm.index  # save this for reconstructing DF later
         X = storm[model_vals]
         y = storm['AL']
 
@@ -301,6 +308,9 @@ def main():
     #     plt.plot(index_array[i], y_array[i], label="Actual AL")
     #     plt.legend(loc='best')
 
+    # ---------------------------------------------------------------
+    # REGRESSION METRICS
+
     # ***************************************************************
     # ***************************************************************
     # PERSISTENCE MODEL
@@ -312,14 +322,14 @@ def main():
 
     # Needs shape (n_samples, n_features)
     # Split the data into two parts, one for training and testing
-    print("\nPrepared persistence DF 2003:")
+    print("Prepared persistence DF 2003:")
     print(pers_2003)
-    print("\nPrepared persistence DF AL:")
+    print("Prepared persistence DF AL:")
     print(pers_AL)
 
     # 60% of data for training, 40% of data held back for testing
     # using 47 as seed for repeatbility (its 42 rounded for inflation :P)
-    X_train, X_test, y_train, y_test = train_test_split(
+    pers_X_train, pers_X_test, pers_y_train, pers_y_test = train_test_split(
         pers_2003, pers_AL, test_size=0.4, random_state=47)
 
     # ---------------------------------------------------------------
@@ -328,92 +338,144 @@ def main():
     pers_regr = LinearRegression()
 
     # train it on the training data
-    pers_regr.fit(X_train, y_train)
+    pers_regr.fit(pers_X_train, pers_y_train)
 
     # ---------------------------------------------------------------
     # CROSS VALIDATION
     pers_regr_scores = cross_val_score(pers_regr, pers_2003, pers_AL, cv=10)
-    print("\nThe persistence linear regression CV scores:", pers_regr_scores)
-    print("\nAccuracy: %0.2f (+/- %0.2f)" %
+    print("The persistence linear regression CV scores:", pers_regr_scores)
+    print("Accuracy: %0.2f (+/- %0.2f)" %
           (pers_regr_scores.mean(), pers_regr_scores.std() * 2))
 
     # ---------------------------------------------------------------
     # STANDARD SCALING
     # storm_array has been untouched, its literally just the raw data
     # reusing it means no having to load in a few hundred mb of pickles again
+    # the scalers were also defined before discretization, so can reuse
 
     # The features we care about
     model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
 
-    X_array = []
-    y_array = []
+    pers_X_array = []
+    pers_y_array = []
     for i, storm in enumerate(storm_array):
         storm_index = storm.index
-        X = storm[model_vals]
-        y = storm['AL']
+        pers_X = storm[model_vals]
+        pers_y = storm['AL']
 
         # scale the main features
-        X_trans = scaler.transform(X)
+        pers_X_trans = scaler.transform(pers_X)
 
         # need to add it back into a DF
-        X_array.append(pd.DataFrame(X_trans,
-                                    columns=df_2003_cols, index=storm_index))
+        pers_X_array.append(pd.DataFrame(pers_X_trans,
+                                         columns=df_2003_cols,
+                                         index=storm_index))
 
         # scale AL
-        y = y.to_numpy()
-        y = y.reshape(-1, 1)
-        y_trans = scaler2.transform(y)
+        pers_y = pers_y.to_numpy()
+        pers_y = pers_y.reshape(-1, 1)
+        pers_y_trans = scaler2.transform(pers_y)
 
         # need to add it back into a DF
-        y_array.append(pd.DataFrame(y_trans,
-                                    columns=['AL'], index=storm_index))
+        pers_y_array.append(pd.DataFrame(pers_y_trans,
+                                         columns=['AL'], index=storm_index))
 
     # ---------------------------------------------------------------
     # DROPPING USELESS PARAMETERS
     # removing n_p - in the words of Mayur
     # "by far weakest correlation with AL and a strong correlation with P"
-    for i, X in enumerate(X_array):
-        X_array[i] = X.drop(["n_p"], axis=1)
+    for i, pers_X in enumerate(pers_X_array):
+        pers_X_array[i] = pers_X.drop(["n_p"], axis=1)
 
     # ---------------------------------------------------------------
     # INTERPOLATE AND DROPNA IN THE TEST STORMS
     # have to add AL back in so that the dropped datetimes are consistent!
 
-    interpolated_array = []
-    index_array = []  # each storm will drop seperate dt, need to store indexes
+    pers_interpolated_array = []
+    pers_index_array = []  # each storm drops seperate dt, need to store index
 
-    for i, X in enumerate(X_array):
-        X.insert(4, "AL", y_array[i])  # add AL back in
+    for i, pers_X in enumerate(pers_X_array):
+
+        # add AL back in
+        pers_X.insert(4, "AL", pers_y_array[i])
 
         # interpolate the storm - pars AND AL in one go
-        interpolated_array.append(storm_interpolator(X))
+        pers_interpolated_array.append(storm_interpolator(pers_X))
 
         # store the new index for this storm, for later
-        index_array.append(interpolated_array[i].index)
+        pers_index_array.append(pers_interpolated_array[i].index)
 
     # seperate AL back out again!
-    for i, storm in enumerate(interpolated_array):
-        X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
-        y_array[i] = storm["AL"]
+    for i, storm in enumerate(pers_interpolated_array):
+        pers_X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
+        pers_y_array[i] = storm["AL"]
 
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
-    y_pred_array = []
-    for X in X_array:
-        y_pred_array.append(pers_regr.predict(X))
+
+    pers_y_pred_array = []
+
+    for pers_X in pers_X_array:
+        pers_y_pred_array.append(pers_regr.predict(pers_X))
 
     # ---------------------------------------------------------------
     # PLOTTING PREDICTED VS PERSISTENCE (DISCRETIZED) AL
 
     # Plot the predicted data vs our persistence AL
-    for i in range(0, len(y_array)):
+    for i in range(0, len(pers_y_array)):
         plt.figure()
         plt.title("Storm from " + storm_str_array[i])
-        plt.plot(index_array[i], y_pred_array[i], label="Predicted AL")
-        plt.plot(index_array[i], y_array[i], label="Persistence AL")
+        plt.plot(pers_index_array[i], pers_y_pred_array[i],
+                 label="Persistence Predicted AL")
+        plt.plot(pers_index_array[i], pers_y_array[i],
+                 label="Persistence True AL")
         plt.legend(loc='best')
 
+    # ***************************************************************
+    # ***************************************************************
+    # METRICS
+    # ***************************************************************
+    # ***************************************************************
     
+    # # ---------------------------------------------------------------
+
+    # def storm_metrics(y_true, y_pers, y_pred):
+    #     """Runs various regression metrics from sklearn.metrics"""
+    #     print("Explained variance score (higher is better, best 1.0):")
+    #     print("Discretized AL:", explained_variance_score(y_true, y_pred))
+    #     print("Persistence AL:", explained_variance_score(y_pers, y_pred))
+
+    #     print("Max error (lower is better). Only one point, unsure if useful.")
+    #     print("Discretized AL:", max_error(y_true, y_pred))
+    #     print("Persistence AL:", max_error(y_pers, y_pred))
+
+    #     print("Mean absolute error (lower is better, best 0.0):")
+    #     print("Discretized AL:", mean_absolute_error(y_true, y_pred))
+    #     print("Persistence AL:", mean_absolute_error(y_pers, y_pred))
+
+    #     print("Mean squared error (lower is better, best 0.0):")
+    #     print("Discretized AL:", mean_squared_error(y_true, y_pred))
+    #     print("Persistence AL:", mean_squared_error(y_pers, y_pred))
+
+    #     # this penalizes underpreciction more than overprediction
+    #     # Mean squared logarithmic error (lower is better, best 0.0)
+    #     # Penalizes underpreciction better. Good for exponential growth.
+    #     # Unsure of usefulness here."
+    #     print("Discretized AL:", mean_squared_log_error(y_true, y_pred))
+    #     print("Persistence AL:", mean_squared_log_error(y_pers, y_pred))
+
+    #     # not too affected by outliers - good choice of metric?
+    #     print("Median absolute error (lower is better, best 0.0):")
+    #     print("Discretized AL:", median_absolute_error(y_true, y_pred))
+    #     print("Persistence AL:", median_absolute_error(y_pers, y_pred))
+
+    #     # variance is dependent on dataset, might be a pitfall
+    #     print("R^2 coefficient of determination:")
+    #     print("Discretized AL:", r2_score(y_true, y_pred))
+    #     print("Persistence AL:", r2_score(y_pers, y_pred))
+
+    #     # worth investigation mean_tweedie_deviance?
+
 # 2020-09-01 meeting
 # TODO: REMOVING USELESS PARAMETERS
 # mutual info can also tell us something about "drivers"
