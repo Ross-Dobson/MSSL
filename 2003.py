@@ -3,14 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import datetime
+from tqdm import tqdm
 # remember to run 'matplotlib tk' in the interpreter
 
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import explained_variance_score, max_error, mean_absolute_error, mean_squared_error, mean_squared_log_error, median_absolute_error, r2_score
-
+from sklearn.metrics import explained_variance_score, max_error, mean_absolute_error, mean_squared_error, median_absolute_error, r2_score
 from SolarWindImport import import_omni_year, import_omni_month, import_storm_week, storm_interpolator
 
 
@@ -131,7 +130,6 @@ def main():
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     df_2003 = storm_interpolator(df_2003)
-
     print("2003 data interpolated.")
 
     # ---------------------------------------------------------------
@@ -158,7 +156,7 @@ def main():
 
     # create a copy before shifting - this is for persistence model later
     pers_AL = discrete_AL.copy()
-    pers_2003 = df_2003.copy()
+    pers_AL_index = pers_AL.index
 
     # now, because this isn't a native argument, we roll left by shifting
     discrete_AL = discrete_AL.shift(-30)
@@ -172,9 +170,8 @@ def main():
     # now, drop the last 30 minutes of all the other data so shapes stay equal
     df_2003.drop(df_2003.tail(30).index, inplace=True)
 
-    # for the persistence model, we do the same, but with the head
+    # for the persistence model, we do the same, but they'll drop from head
     pers_AL.dropna(axis='index', how='any', inplace=True)
-    pers_2003.drop(pers_2003.head(29).index, inplace=True)  # dont ask why 29
 
     # ---------------------------------------------------------------
     # TRAIN TEST SPLIT
@@ -183,7 +180,7 @@ def main():
     # Split the data into two parts, one for training and testing
 
     # 60% of data for training, 40% of data held back for testing
-    # using 47 as seed for repeatbility (its 42 rounded for inflation :P)
+    # using 47 as seed for repeatbility
     X_train, X_test, y_train, y_test = train_test_split(
         df_2003, discrete_AL, test_size=0.4, random_state=47)
 
@@ -201,6 +198,80 @@ def main():
     print("The linear regression CV scores are", regr_scores)
     print("Accuracy: %0.2f (+/- %0.2f)" %
           (regr_scores.mean(), regr_scores.std() * 2))
+
+    y_pred = regr.predict(X_test)
+
+    # put y pred back in a dataframe, just makes life easier for future
+    y_test_index = y_test.index
+    y_pred = pd.DataFrame(y_pred, columns=['AL'], index=y_test_index)
+
+    # ---------------------------------------------------------------
+    # MAKING PERSISTENCE MATCH
+
+    # earliest datetime that != NaN (because of rolling left by default)
+    earliest_dt = pers_AL.index[0]
+
+    # similarly, latest that != Nan (because this is rolled right, shifted -30)
+    latest_dt = discrete_AL.index[-1]
+
+    # so now we can make an index of these happy values to use
+    happy_index = y_test_index[(y_test_index >= earliest_dt)
+                               & (y_test_index <= latest_dt)]
+
+    test_df = pd.DataFrame(
+        y_test[happy_index], columns=['AL'], index=happy_index)
+
+    pred_df = pd.DataFrame(y_pred, columns=['AL'], index=y_test_index)
+    pred_df = pred_df.loc[happy_index]
+
+    pers_df = pd.DataFrame(pers_AL, columns=['AL'], index=pers_AL_index)
+    pers_df = pers_df.loc[happy_index]
+
+    # ---------------------------------------------------------------
+    # EVALUATING OUR MODEL VS PERSISTENCE MODEL
+
+    def storm_metrics(y_true, y_pred, y_pers):
+        """
+        Runs various regression metrics from sklearn.metrics
+        """
+
+        print("\nExplained variance score (higher is better, best 1.0):")
+        print("Discretized AL:",
+              explained_variance_score(y_true, y_pred))
+        print("Persistence AL:",
+              explained_variance_score(y_true, y_pers))
+
+        print("\nMean absolute error (lower is better, best 0.0):")
+        print("Discretized AL:", mean_absolute_error(y_true, y_pred))
+        print("Persistence AL:", mean_absolute_error(y_true, y_pers))
+
+        print("\nMean squared error (lower is better, best 0.0):")
+        print("Discretized AL:", mean_squared_error(y_true, y_pred))
+        print("Persistence AL:", mean_squared_error(y_true, y_pers))
+
+        # this penalizes underpreciction more than overprediction
+        # Mean squared logarithmic error (lower is better, best 0.0)
+        # Penalizes underpreciction better. Good for exponential growth.
+        # Unsure of usefulness here."
+        # print("Discretized AL:", mean_squared_log_error(
+        #     y_true, y_pred))
+        # print("Persistence AL:", mean_squared_log_error(
+        #     y_true, y_pers))
+
+        # not too affected by outliers - good choice of metric?
+        print("\nMedian absolute error (lower is better, best 0.0):")
+        print("Discretized AL:", median_absolute_error(
+            y_true, y_pred))
+        print("Persistence AL:", median_absolute_error(
+            y_true, y_pers))
+
+        # variance is dependent on dataset, might be a pitfall
+        print("\nR2 coefficient of determination (higher=better), best 1)")
+        print("Discretized AL:", r2_score(y_true, y_pred))
+        print("Persistence AL:", r2_score(y_true, y_pers))
+
+    print("DEBUG 470")
+    storm_metrics(test_df, pred_df, pers_df)
 
     # ***************************************************************
     # ***************************************************************
@@ -306,191 +377,6 @@ def main():
     #     plt.plot(index_array[i], y_pred_array[i], label="Predicted AL")
     #     plt.plot(index_array[i], y_array[i], label="Actual AL")
     #     plt.legend(loc='best')
-
-    # ***************************************************************
-    # ***************************************************************
-    # PERSISTENCE MODEL
-    # ***************************************************************
-    # ***************************************************************
-
-    # ---------------------------------------------------------------
-    # TRAIN TEST SPLIT
-
-    # Needs shape (n_samples, n_features)
-    # Split the data into two parts, one for training and testing
-    # 60% of data for training, 40% of data held back for testing
-    # using 47 as seed for repeatbility (its 42 rounded for inflation :P)
-    pers_X_train, pers_X_test, pers_y_train, pers_y_test = train_test_split(
-        pers_2003, pers_AL, test_size=0.4, random_state=47)
-
-    # ---------------------------------------------------------------
-    # LINEAR REGRESSION
-    # create the linear regression object
-    pers_regr = LinearRegression()
-
-    # train it on the training data
-    pers_regr.fit(pers_X_train, pers_y_train)
-
-    # ---------------------------------------------------------------
-    # CROSS VALIDATION
-    pers_regr_scores = cross_val_score(pers_regr, pers_2003, pers_AL, cv=10)
-    print("The persistence linear regression CV scores:", pers_regr_scores)
-    print("Accuracy: %0.2f (+/- %0.2f)" %
-          (pers_regr_scores.mean(), pers_regr_scores.std() * 2))
-
-    # ---------------------------------------------------------------
-    # STANDARD SCALING
-    # storm_array has been untouched, its literally just the raw data
-    # reusing it means no having to load in a few hundred mb of pickles again
-    # the scalers were also defined before discretization, so can reuse
-
-    # The features we care about
-    model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
-
-    pers_X_array = []
-    pers_y_array = []
-    for i, storm in enumerate(storm_array):
-        storm_index = storm.index
-        pers_X = storm[model_vals]
-        pers_y = storm['AL']
-
-        # scale the main features
-        pers_X_trans = scaler.transform(pers_X)
-
-        # need to add it back into a DF
-        pers_X_array.append(pd.DataFrame(pers_X_trans,
-                                         columns=df_2003_cols,
-                                         index=storm_index))
-
-        # scale AL
-        pers_y = pers_y.to_numpy()
-        pers_y = pers_y.reshape(-1, 1)
-        pers_y_trans = scaler2.transform(pers_y)
-
-        # need to add it back into a DF
-        pers_y_array.append(pd.DataFrame(pers_y_trans,
-                                         columns=['AL'], index=storm_index))
-
-    # ---------------------------------------------------------------
-    # DROPPING USELESS PARAMETERS
-    # removing n_p - in the words of Mayur
-    # "by far weakest correlation with AL and a strong correlation with P"
-    for i, pers_X in enumerate(pers_X_array):
-        pers_X_array[i] = pers_X.drop(["n_p"], axis=1)
-
-    # ---------------------------------------------------------------
-    # INTERPOLATE AND DROPNA IN THE TEST STORMS
-    # have to add AL back in so that the dropped datetimes are consistent!
-
-    pers_interpolated_array = []
-    pers_index_array = []  # each storm drops seperate dt, need to store index
-
-    for i, pers_X in enumerate(pers_X_array):
-
-        # add AL back in
-        pers_X.insert(4, "AL", pers_y_array[i])
-
-        # interpolate the storm - pars AND AL in one go
-        pers_interpolated_array.append(storm_interpolator(pers_X))
-
-        # store the new index for this storm, for later
-        pers_index_array.append(pers_interpolated_array[i].index)
-
-    # seperate AL back out again!
-    for i, storm in enumerate(pers_interpolated_array):
-        pers_X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
-        pers_y_array[i] = storm["AL"]
-
-    print("Persistence model test storms interpolated.")
-    # ---------------------------------------------------------------
-    # PREDICTING THE DATA
-
-    pers_y_pred_array = []
-
-    for pers_X in pers_X_array:
-        pers_y_pred_array.append(pers_regr.predict(pers_X))
-
-    # ---------------------------------------------------------------
-    # PLOTTING PREDICTED VS PERSISTENCE (DISCRETIZED) AL
-
-    Plot the predicted data vs our persistence AL
-    for i in range(0, len(pers_y_array)):
-        plt.figure()
-        plt.title("Storm from " + storm_str_array[i])
-        plt.plot(pers_index_array[i], pers_y_pred_array[i],
-                 label="Persistence Predicted AL")
-        plt.plot(pers_index_array[i], pers_y_array[i],
-                 label="Persistence True AL")
-        plt.legend(loc='best')
-
-    # ***************************************************************
-    # ***************************************************************
-    # METRICS
-    # ***************************************************************
-    # ***************************************************************
-
-    # # ---------------------------------------------------------------
-
-    def storm_metrics(strs, y_true, y_pred, pers_true, pers_pred):
-        """
-        Runs various regression metrics from sklearn.metrics
-        """
-
-        for i in range(0, len(strs)):
-
-            print("\nSTORM:", strs[i], "\n")
-
-            print("\nExplained variance score (higher is better, best 1.0):")
-            print("Discretized AL:", explained_variance_score(
-                y_true[i], y_pred[i]))
-            print("Persistence AL:",
-                  explained_variance_score(pers_true[i], pers_pred[i]))
-
-            # Only one datum used. Not sure this is at all useful tbh.
-            print("\nMax error (lower is better).")
-            print("Discretized AL:", max_error(y_true[i], y_pred[i]))
-            print("Persistence AL:", max_error(pers_true[i], pers_pred[i]))
-
-            print("\nMean absolute error (lower is better, best 0.0):")
-            print("Discretized AL:", mean_absolute_error(y_true[i], y_pred[i]))
-            print("Persistence AL:", mean_absolute_error(
-                pers_true[i], pers_pred[i]))
-
-            print("\nMean squared error (lower is better, best 0.0):")
-            print("Discretized AL:", mean_squared_error(y_true[i], y_pred[i]))
-            print("Persistence AL:", mean_squared_error(
-                pers_true[i], pers_pred[i]))
-
-            # this penalizes underpreciction more than overprediction
-            # Mean squared logarithmic error (lower is better, best 0.0)
-            # Penalizes underpreciction better. Good for exponential growth.
-            # Unsure of usefulness here."
-            # print("Discretized AL:", mean_squared_log_error(
-            #     y_true[i], y_pred[i]))
-            # print("Persistence AL:", mean_squared_log_error(
-            #     pers_true[i], pers_pred[i]))
-
-            # not too affected by outliers - good choice of metric?
-            print("\nMedian absolute error (lower is better, best 0.0):")
-            print("Discretized AL:", median_absolute_error(
-                y_true[i], y_pred[i]))
-            print("Persistence AL:", median_absolute_error(
-                pers_true[i], pers_pred[i]))
-
-            # variance is dependent on dataset, might be a pitfall
-            print("\nR2 coefficient of determination (higher=better), best 1)")
-            print("Discretized AL:", r2_score(y_true[i], y_pred[i]))
-            print("Persistence AL:", r2_score(pers_true[i], pers_pred[i]))
-
-    storm_metrics(storm_str_array,
-                  y_array, y_pred_array, pers_y_array, pers_y_pred_array)
-
-    # worth investigation mean_tweedie_deviance?
-    print("\n---\n")
-    print("Is it worth investigating mean_tweedie_deviance?")
-    print("Mean Square Log - check what Andy said about abs-logging")
-    print("all our values? (MSL wont run due to negative numbers)")
-            
 
 # 2020-09-01 meeting
 # TODO: REMOVING USELESS PARAMETERS
