@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import mutual_info_regression
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import explained_variance_score, max_error, mean_absolute_error, mean_squared_error, median_absolute_error, r2_score
 from SolarWindImport import import_omni_year, import_omni_month, import_storm_week, storm_interpolator
@@ -120,6 +121,21 @@ def main():
     # print("\nCorr after standardization:\n")
     # print(df_2003.corr())
 
+    # ---------------------------------------------------------------
+    # MUTUAL INFORMATION
+
+    # we need to prepare the data, but lets use copies so we cant break itself
+    mi_2003 = df_2003.copy()
+    mi_2003.dropna(axis='index', how='any', inplace=True)
+    mi_AL = mi_2003['AL']
+    mi_2003.drop(['AL'], axis=1)
+
+    # first off, let's just check what correlates with AL
+    print("marco")
+    mi = mutual_info_regression(mi_2003, mi_AL)
+    print("polo")
+    print(len(mi))
+    print("lupo")
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
 
@@ -377,102 +393,6 @@ def main():
     #     plt.plot(index_array[i], y_pred_array[i], label="Predicted AL")
     #     plt.plot(index_array[i], y_array[i], label="Actual AL")
     #     plt.legend(loc='best')
-
-# 2020-09-01 meeting
-# TODO: REMOVING USELESS PARAMETERS
-# mutual info can also tell us something about "drivers"
-
-# TODO: CROSS VALIDATION
-# If we have sufficient extreme data in each fold, we can reduce each fold
-# dependent on amount of data
-#
-# might be doing a good job predicting when "Nothing" is happening but not good
-# for predicitng extremes.
-# so test the model with another year's storm - use the NASA link?
-# visualisation - two lines - here's what data did, here's what model did
-# but not great as ony predicting one timestep ahead
-# instead: linegraph of AL over time. Pick out one point in the storm
-# "this is the solar wind input I'm providing". Then present entry X, answer Y
-# for a particular point in the storm. So feed in a datetime etc. Need to be
-# careful with shapes (.reshape()).
-# So, to start, plug in a storm from a different year, then plot real AL vs
-# predicted AL for that other year.
-#
-# OTHER METRICS
-# method 1: use another metric? R^2, mean square error, etc.
-# Dont imagine they give much difference...
-# Method 2: engineer your output - AL varies between +- 10~20 nanoTesla
-# but then drops to -100, -200. Engi the output to make it more sensitive
-# to extreme events. Take absolute, then take Log, which will scale the whole.
-# Might compress the metrics to either take more account, or neglect the
-# extremes. Eg ground mag field perturbation studies, takes the Log10
-# because by default it varies by 5 order of mag. Will ignore small stuff if
-# its not logged.
-# way to test this: feed in validation storm from another year, then have loads
-# of dashed lines from all the different ways of metrics, different models
-#
-# Summary so far:
-#
-# Feature selection - look at mutual information between aprameters
-# might pick up squared relationships etc
-# Metrics and outputs: ways to check they are doign what we think they are
-#
-# Extension:
-# another baseline model we want to compare to
-# first one: persistence models - if it does well, nothing reallys happening
-# and you model is not adding any value.
-# The way to code this is that your previous timestep is the answer to the next
-# Persistence models wont pick up any interesting events.
-# You can do this by shifting all the answers along by 1? Then compare
-# something like sum-of-squares by providing the 1-shift set as your answers
-# Ideally, we want to outperform our persistence model - or we're not doing
-# anything useful! A way of benchmarking the forecast.
-# Mean of previous day, 4hr rolling cyclical forecast various methods and cases
-# Solar physics often use ~24 days as sun spins every ~24d. So they wanna
-# beat that.
-#
-# Week centred on the storm would be a good predictor period.
-#
-# MEETING Notes 2020-09-08
-# model is a linear reg. Good benchmark. Simple model, we can compare to easily
-# anny more complicated model SHOULD beat this. If we dont beat it, then
-# something has gone wrong, or its topo complicated and confusing itself
-# whatever metric we compare, keep it stored and compare later on with neural
-# nets. So, if we use mean squared or whatever metric.
-# So, this week, get metrics out, that'd be nice.
-# ALSO, persistence model. "we have complicated model, but it beats linreg AND
-# persistence", thats a good justification.
-# evaluate during the storms intervals. Thats the time thats really critical.
-# else its just boring times. persistence will do really well, as nothing is
-# changing. But storm is the time we really should see improvement.
-# Also, mutual inforation, which is more important for NN as limiting the
-# inputs saves a LOTTTTT of time training, and perhaps even better results.
-# sklearn mutual info score.
-# persistence model:
-# undo the shift, keep the rolling minimum, so its off to the right?
-# LONG TERM STRETCH GOAL
-# look into artifical neural networks. Recurrent are also good for time series
-# forecast. but ANNs are good starting point. LSTMs are an example of recurrent
-# neural network, with a "forget" function. Quicker than normal RNN.
-
-# meeting notes 15th
-# first array are the unshifted AL values 0 to 30
-# second array is the shifted persistence AL
-#
-# mutual info:
-# start with, feed in density and pressure (np and p) - they should be related
-# mutual_info_regression: do the feature array vs AL
-# and each feature vs feature
-#
-# checking parameters that are more easily predicted eg solar wind speed
-# rather than just using the L1 data that we are using currently
-# buuuuut this is more something for the discussion
-#
-# svr - random forest regressor
-# good idea - random forest, do a graph: x is no features, y is any old metric
-# then pick the highest score. GOod way to investigate features
-#
-# stretch goal: shorter time period - (12h either side)? desirable in future
 
 
 main()
