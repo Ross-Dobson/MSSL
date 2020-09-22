@@ -130,12 +130,22 @@ def main():
     mi_AL = mi_2003['AL']
     mi_2003.drop(['AL'], axis=1)
 
-    # first off, let's just check what correlates with AL
-    print("marco")
-    mi = mutual_info_regression(mi_2003, mi_AL)
-    print("polo")
-    print(len(mi))
-    print("lupo")
+    # have to reshape all the arrays...
+
+    mi_B_X = mi_2003['B_X_GSM'].to_numpy().reshape(-1, 1)
+    mi_B_Y = mi_2003['B_Y_GSM'].to_numpy().reshape(-1, 1)
+    mi_B_Z = mi_2003['B_Z_GSM'].to_numpy().reshape(-1, 1)
+    mi_n_p = mi_2003['n_p'].to_numpy()
+    mi_P = mi_2003['P'].to_numpy()
+    mi_V = mi_2003['V'].to_numpy().reshape(-1, 1)
+    mi_AL = mi_AL.to_numpy()
+
+    mi_poop = mi_2003[['n_p', 'P']]
+    print("DEBUG 1000")
+    print(mi_poop)
+    # first off, lets do something that we suspect correlates. E.g. np and p
+    print("\nMI for n_p and P:")
+    print(mutual_info_regression(mi_poop, mi_AL))
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
 
