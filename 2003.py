@@ -55,7 +55,7 @@ def main():
     # ---------------------------------------------------------------
     # PLOTTING THE PARAMETERS
 
-    plot_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'AL', 'P', 'V']
+    plot_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V', 'AL']
 
     # for val in plot_vals:
         # year_title = str(val) + ' in ' + str(year)
@@ -123,29 +123,45 @@ def main():
 
     # ---------------------------------------------------------------
     # MUTUAL INFORMATION
+    print("\nMUTUAL INFORMATION:")
+    # 1 year data crashes. Lets use just the storm
+    start_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)
+    end_dt = datetime.datetime(2003, 11, 1, 0, 0, 0)
 
-    # we need to prepare the data, but lets use copies so we cant break itself
+    # make copy so we cant break anything
     mi_2003 = df_2003.copy()
+    # print("\n\n\nMI 2003 BEFORE LOC:")
+    # print(mi_2003)
+
+    mi_2003 = mi_2003.loc[start_dt:end_dt]
     mi_2003.dropna(axis='index', how='any', inplace=True)
     mi_AL = mi_2003['AL']
     mi_2003.drop(['AL'], axis=1)
+    # print("MI 2003 AFTER LOC:")
+    # print(mi_2003)
+    # print("\n\n\n")
 
-    # have to reshape all the arrays...
+    print("\n\n\nTHIS MIGHT NOT GO WELL")
 
-    mi_B_X = mi_2003['B_X_GSM'].to_numpy().reshape(-1, 1)
-    mi_B_Y = mi_2003['B_Y_GSM'].to_numpy().reshape(-1, 1)
-    mi_B_Z = mi_2003['B_Z_GSM'].to_numpy().reshape(-1, 1)
-    mi_n_p = mi_2003['n_p'].to_numpy()
-    mi_P = mi_2003['P'].to_numpy()
-    mi_V = mi_2003['V'].to_numpy().reshape(-1, 1)
-    mi_AL = mi_AL.to_numpy()
+    print(mutual_info_regression(mi_2003, mi_AL))
+    # mi_array = [mi_B_X, mi_B_Y, mi_B_Z, mi_n_p, mi_P, mi_V]
 
-    mi_poop = mi_2003[['n_p', 'P']]
-    print("DEBUG 1000")
-    print(mi_poop)
-    # first off, lets do something that we suspect correlates. E.g. np and p
-    print("\nMI for n_p and P:")
-    print(mutual_info_regression(mi_poop, mi_AL))
+    for i, feature in enumerate(model_vals):
+        print("\nMutual information for", feature, "vs the others:")
+        feature_array = model_vals.copy()
+        feature_array = np.delete(feature_array, i)
+        feature_array = np.array(feature_array)
+        big_df = mi_2003.copy()
+        big_df = big_df.drop([feature], axis=1)
+        big_df = big_df.to_numpy()
+        small_df = mi_2003[feature]
+        small_df = small_df.to_numpy()
+        print(feature_array)
+        print(mutual_info_regression(big_df, small_df))
+
+    # print("Test scenario: n_p and P should have high MI:")
+    # print(mutual_info_regression(mi_P.reshape(-1, 1), mi_n_p))
+
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
 
@@ -156,7 +172,7 @@ def main():
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     df_2003 = storm_interpolator(df_2003)
-    print("2003 data interpolated.")
+    print("\n2003 data interpolated.")
 
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
@@ -221,7 +237,8 @@ def main():
     # ---------------------------------------------------------------
     # CROSS VALIDATION
     regr_scores = cross_val_score(regr, df_2003, discrete_AL, cv=10)
-    print("The linear regression CV scores are", regr_scores)
+    print("\nThe linear regression CV scores are:")
+    print(regr_scores)
     print("Accuracy: %0.2f (+/- %0.2f)" %
           (regr_scores.mean(), regr_scores.std() * 2))
 
@@ -260,7 +277,8 @@ def main():
         """
         Runs various regression metrics from sklearn.metrics
         """
-
+        print("\nSTORM METRICS:")
+        
         print("\nExplained variance score (higher is better, best 1.0):")
         print("Discretized AL:",
               explained_variance_score(y_true, y_pred))
@@ -295,8 +313,7 @@ def main():
         print("\nR2 coefficient of determination (higher=better), best 1)")
         print("Discretized AL:", r2_score(y_true, y_pred))
         print("Persistence AL:", r2_score(y_true, y_pers))
-
-    print("DEBUG 470")
+    
     storm_metrics(test_df, pred_df, pers_df)
 
     # ***************************************************************
