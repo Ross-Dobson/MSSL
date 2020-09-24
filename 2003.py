@@ -236,14 +236,11 @@ def main():
     regr.fit(X_train, y_train)
 
     # ---------------------------------------------------------------
-    # CROSS VALIDATION
-    regr_scores = cross_val_score(regr, df_2003, df_AL, cv=10)
-    print("\nThe linear regression CV scores are:")
-    print(regr_scores)
-    print("Accuracy: %0.2f (+/- %0.2f)" %
-          (regr_scores.mean(), regr_scores.std() * 2))
-
+    # LINEAR REGRESSION PREDICTION AND SCORES
     y_pred = regr.predict(X_test)
+
+    print("\nLinear Regression score (R^2 coeff, best 1.0):")
+    print("Score:", regr.score(X_test, y_test))
 
     # put y pred back in a dataframe, just makes life easier for future
     y_test_index = y_test.index
