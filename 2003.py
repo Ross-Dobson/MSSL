@@ -9,7 +9,7 @@ from tqdm import tqdm
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.metrics import explained_variance_score, max_error, mean_absolute_error, mean_squared_error, median_absolute_error, r2_score
 from SolarWindImport import import_omni_year, import_omni_month, import_storm_week, storm_interpolator
 
@@ -124,27 +124,25 @@ def main():
     # ---------------------------------------------------------------
     # MUTUAL INFORMATION
     print("\nMUTUAL INFORMATION:")
-    # 1 year data crashes. Lets use just the storm
-    start_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)
-    end_dt = datetime.datetime(2003, 11, 1, 0, 0, 0)
 
-    # make copy so we cant break anything
-    mi_2003 = df_2003.copy()
-    # print("\n\n\nMI 2003 BEFORE LOC:")
-    # print(mi_2003)
+    # 1 year data crashes. Lets use 1 week, centred on 24h storm
+    storm_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)  # start of storm
+    start_dt = storm_dt - datetime.timedelta(days=3)  # start of week: -3d
+    end_dt = storm_dt + datetime.timedelta(days=4)  # end of week: +4d
 
-    mi_2003 = mi_2003.loc[start_dt:end_dt]
-    mi_2003.dropna(axis='index', how='any', inplace=True)
-    mi_AL = mi_2003['AL']
-    mi_2003 = mi_2003.drop(['AL'], axis=1)
-    # print("MI 2003 AFTER LOC:")
-    # print(mi_2003)
-    # print("\n\n\n")
+    mi_2003 = df_2003.copy()  # make copy so we cant break anything
+
+    mi_2003 = mi_2003.loc[start_dt:end_dt]  # narrow to week
+    mi_2003.dropna(axis='index', how='any', inplace=True)  # drop NaNs
+    mi_AL = mi_2003['AL']  # get AL seperately, to compare w all other features
+    mi_2003 = mi_2003.drop(['AL'], axis=1)  # now drop AL from features
+
+    print("\nExample scenario: n_p and P should have high MI:")
+    print(mutual_info_regression(
+        mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
 
     print(model_vals, "vs AL:")
-
     print(mutual_info_regression(mi_2003, mi_AL))
-    # mi_array = [mi_B_X, mi_B_Y, mi_B_Z, mi_n_p, mi_P, mi_V]
 
     for i, feature in enumerate(model_vals):
         print("\nMutual information for", feature, "vs the others:")
@@ -157,9 +155,6 @@ def main():
         small_df = small_df.to_numpy()
         print(feature_array)
         print(mutual_info_regression(big_df, small_df))
-
-    # print("Test scenario: n_p and P should have high MI:")
-    # print(mutual_info_regression(mi_P.reshape(-1, 1), mi_n_p))
 
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
@@ -193,20 +188,20 @@ def main():
 
     # Roll right, 30 minutes.
     # E.g. 12:00-12:30 -> 12:30, 12:01-12:31 -> 12:31
-    discrete_AL = df_AL.rolling(30).min()
+    df_AL = df_AL.rolling(30).min()
 
     # create a copy before shifting - this is for persistence model later
-    pers_AL = discrete_AL.copy()
+    pers_AL = df_AL.copy()
     pers_AL_index = pers_AL.index
 
     # now, because this isn't a native argument, we roll left by shifting
-    discrete_AL = discrete_AL.shift(-30)
+    df_AL = df_AL.shift(-30)
 
     # ---------------------------------------------------------------
     # SOLUTION TO NAN ISSUES FROM TIMESHIFTING
 
     # drop the nans in the last 30 elements of the discretized AL
-    discrete_AL.dropna(axis='index', how='any', inplace=True)
+    df_AL.dropna(axis='index', how='any', inplace=True)
 
     # now, drop the last 30 minutes of all the other data so shapes stay equal
     df_2003.drop(df_2003.tail(30).index, inplace=True)
@@ -219,12 +214,19 @@ def main():
 
     # Needs shape (n_samples, n_features)
     # Split the data into two parts, one for training and testing
+    # 5 splits, which I think leads to 6 sets of data, 2 months each
+    # first 5 (k) are training, 6th (k+1)th one is testing
 
-    # 60% of data for training, 40% of data held back for testing
-    # using 47 as seed for repeatbility
-    X_train, X_test, y_train, y_test = train_test_split(
-        df_2003, discrete_AL, test_size=0.4, random_state=47)
+    tscv = TimeSeriesSplit()
+    fold_counter = 1
+    for train_index, test_index in tscv.split(df_2003):
+        # print("TRAIN:", train_index, "TEST:", test_index)  # debug
+        print("Fold", fold_counter, "...")
+        X_train, X_test = df_2003.iloc[train_index], df_2003.iloc[test_index]
+        y_train, y_test = df_AL.iloc[train_index], df_AL.iloc[test_index]
+        fold_counter += 1
 
+    print("Folding complete.")
     # ---------------------------------------------------------------
     # LINEAR REGRESSION
     # create the linear regression object
@@ -235,7 +237,7 @@ def main():
 
     # ---------------------------------------------------------------
     # CROSS VALIDATION
-    regr_scores = cross_val_score(regr, df_2003, discrete_AL, cv=10)
+    regr_scores = cross_val_score(regr, df_2003, df_AL, cv=10)
     print("\nThe linear regression CV scores are:")
     print(regr_scores)
     print("Accuracy: %0.2f (+/- %0.2f)" %
@@ -254,7 +256,7 @@ def main():
     earliest_dt = pers_AL.index[0]
 
     # similarly, latest that != Nan (because this is rolled right, shifted -30)
-    latest_dt = discrete_AL.index[-1]
+    latest_dt = df_AL.index[-1]
 
     # so now we can make an index of these happy values to use
     happy_index = y_test_index[(y_test_index >= earliest_dt)
