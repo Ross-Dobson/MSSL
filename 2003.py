@@ -136,12 +136,12 @@ def main():
     mi_2003 = mi_2003.loc[start_dt:end_dt]
     mi_2003.dropna(axis='index', how='any', inplace=True)
     mi_AL = mi_2003['AL']
-    mi_2003.drop(['AL'], axis=1)
+    mi_2003 = mi_2003.drop(['AL'], axis=1)
     # print("MI 2003 AFTER LOC:")
     # print(mi_2003)
     # print("\n\n\n")
 
-    print("\n\n\nTHIS MIGHT NOT GO WELL")
+    print(model_vals, "vs AL:")
 
     print(mutual_info_regression(mi_2003, mi_AL))
     # mi_array = [mi_B_X, mi_B_Y, mi_B_Z, mi_n_p, mi_P, mi_V]
@@ -150,7 +150,6 @@ def main():
         print("\nMutual information for", feature, "vs the others:")
         feature_array = model_vals.copy()
         feature_array = np.delete(feature_array, i)
-        feature_array = np.array(feature_array)
         big_df = mi_2003.copy()
         big_df = big_df.drop([feature], axis=1)
         big_df = big_df.to_numpy()
