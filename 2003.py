@@ -96,13 +96,14 @@ def main():
     # ---------------------------------------------------------------
     # CORR AFTER STANDARDISATION
 
-    # Add AL back in to the df
-    df_2003.insert(4, "AL", arr_AL_scaled)
+    # # Add AL back in to the df
+    # df_2003.insert(4, "AL", arr_AL_scaled)
 
-    print("\nCorr after standardization:\n")
-    print(df_2003.corr())
+    # print("\nCorr after standardization:\n")
+    # print(df_2003.corr())
 
-    df_2003 = df_2003.drop(["AL"], axis=1)
+    # # drop AL again, don't want it as a feature anymore
+    # df_2003 = df_2003.drop(["AL"], axis=1)
 
     # ---------------------------------------------------------------
     # PERSISTENCE TIME HISTORY OF AL
@@ -217,13 +218,14 @@ def main():
     # 5 splits, which I think leads to 6 sets of data, 2 months each
     # first 5 (k) are training, 6th (k+1)th one is testing
 
+    print("\nFolding the data (cross-validation):")
     tscv = TimeSeriesSplit()
     fold_counter = 1
     for train_index, test_index in tscv.split(df_2003):
         # print("TRAIN:", train_index, "TEST:", test_index)  # debug
         print("Fold", fold_counter, "...")
         X_train, X_test = df_2003.iloc[train_index], df_2003.iloc[test_index]
-        y_train, y_test = df_AL.iloc[train_index], df_AL.iloc[test_index]
+        y_train, y_test = disc_AL.iloc[train_index], disc_AL.iloc[test_index]
         fold_counter += 1
 
     print("Folding complete.")
@@ -244,8 +246,7 @@ def main():
 
     # put y pred back in a dataframe, just makes life easier for future
     y_test_index = y_test.index
-    y_pred = pd.DataFrame(y_pred, columns=['AL'], index=y_test_index)
-
+    y_pred = pd.DataFrame(y_pred, columns=['pred_AL'], index=y_test_index)
     # ---------------------------------------------------------------
     # MAKING PERSISTENCE MATCH
 
@@ -253,17 +254,16 @@ def main():
     earliest_dt = pers_AL.index[0]
 
     # similarly, latest that != Nan (because this is rolled right, shifted -30)
-    latest_dt = df_AL.index[-1]
+    latest_dt = disc_AL.index[-1]
 
     # so now we can make an index of these happy values to use
     happy_index = y_test_index[(y_test_index >= earliest_dt)
                                & (y_test_index <= latest_dt)]
 
     test_df = pd.DataFrame(
-        y_test[happy_index], columns=['AL'], index=happy_index)
+        y_test.loc[happy_index], columns=['AL'], index=happy_index)
 
-    pred_df = pd.DataFrame(y_pred, columns=['AL'], index=y_test_index)
-    pred_df = pred_df.loc[happy_index]
+    pred_df = y_pred.loc[happy_index]
 
     pers_df = pd.DataFrame(pers_AL, columns=['AL'], index=pers_AL_index)
     pers_df = pers_df.loc[happy_index]
@@ -276,7 +276,7 @@ def main():
         Runs various regression metrics from sklearn.metrics
         """
         print("\nSTORM METRICS:")
-        
+
         print("\nExplained variance score (higher is better, best 1.0):")
         print("Discretized AL:",
               explained_variance_score(y_true, y_pred))
@@ -311,18 +311,21 @@ def main():
         print("\nR2 coefficient of determination (higher=better), best 1)")
         print("Discretized AL:", r2_score(y_true, y_pred))
         print("Persistence AL:", r2_score(y_true, y_pers))
-    
-    storm_metrics(test_df, pred_df, pers_df)
+
+    # 2003 data - don't actually want to run metrics on this though
+    # storm_metrics(test_df, pred_df, pers_df)
 
     # ***************************************************************
     # ***************************************************************
-    # IMPORTING THE TEST STORMS, AND PREPARING THE DATA
+    # IMPORTING THE VALIDATION STORMS, AND PREPARING THE DATA
     # ***************************************************************
     # ***************************************************************
 
     # ---------------------------------------------------------------
-    # IMPORT TEST STORMS
+    # IMPORT VALIDATION STORMS
     # from doi:10.1002/swe.20056
+
+    print("\nImporting the validation storms:")
 
     # DONT USE STORM 1 as its in the 2003 model training data!
     # storm_1 = import_storm_week(2003, 10, 29)
@@ -340,14 +343,14 @@ def main():
                        "2010-04-05 to 2010-04-06",
                        "2011-08-05 to 2011-08-06"]
 
-    print("Test storms imported successfully.")
+    print("Validation storms imported successfully.")
 
     # ---------------------------------------------------------------
     # STANDARD SCALING
     # we use the same scalers we used earlier. Remember, "scaler" for features
     # and "scaler2" for AL
 
-    # The features we care about
+    # The features we care about - recall, no persistence yet
     model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
 
     X_array = []
@@ -360,7 +363,7 @@ def main():
         # scale the main features
         X_trans = scaler.transform(X)
 
-        # need to add it back into a DF
+        # each storm's features to a df, append to X_array of dataframes
         X_array.append(pd.DataFrame(X_trans,
                                     columns=df_2003_cols, index=storm_index))
 
@@ -369,10 +372,13 @@ def main():
         y = y.reshape(-1, 1)
         y_trans = scaler2.transform(y)
 
-        # need to add it back into a DF
+        # each storm's AL to a df, append to y_array of dataframes
         y_array.append(pd.DataFrame(y_trans,
                                     columns=['AL'], index=storm_index))
 
+    # ---------------------------------------------------------------
+    # PERSISTENCE AND DISCRETIZATION (is that even a word)
+    
     # ---------------------------------------------------------------
     # DROPPING USELESS PARAMETERS
     # removing n_p - in the words of Mayur
