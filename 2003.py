@@ -143,49 +143,49 @@ def main():
     # ---------------------------------------------------------------
     # MUTUAL INFORMATION
 
-    print("\nMUTUAL INFORMATION:")
+    # print("\nMUTUAL INFORMATION:")
 
-    # 1 year data crashes. Lets use 1 week, centred on 24h storm
-    storm_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)  # start of storm
-    start_dt = storm_dt - datetime.timedelta(days=3)  # start of week: -3d
-    end_dt = storm_dt + datetime.timedelta(days=4)  # end of week: +4d
+    # # 1 year data crashes. Lets use 1 week, centred on 24h storm
+    # storm_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)  # start of storm
+    # start_dt = storm_dt - datetime.timedelta(days=3)  # start of week: -3d
+    # end_dt = storm_dt + datetime.timedelta(days=4)  # end of week: +4d
 
-    # make copy so we cant break anything
-    mi_2003 = df_2003.copy()
+    # # make copy so we cant break anything
+    # mi_2003 = df_2003.copy()
 
-    # reinsert AL for consistent NaN drop
-    mi_2003.insert(7, 'disc_AL', disc_AL)
+    # # reinsert AL for consistent NaN drop
+    # mi_2003.insert(7, 'disc_AL', disc_AL)
 
-    # narrow to week
-    mi_2003 = mi_2003.loc[start_dt:end_dt]
+    # # narrow to week
+    # mi_2003 = mi_2003.loc[start_dt:end_dt]
 
-    # drop NaNs, MI doesn't like them
-    mi_2003.dropna(axis='index', how='any', inplace=True)
+    # # drop NaNs, MI doesn't like them
+    # mi_2003.dropna(axis='index', how='any', inplace=True)
 
-    mi_AL = mi_2003['disc_AL']
-    mi_2003 = mi_2003.drop(['disc_AL'], axis=1)
+    # mi_AL = mi_2003['disc_AL']
+    # mi_2003 = mi_2003.drop(['disc_AL'], axis=1)
 
-    print("\nExample scenario: n_p and P should have high MI:")
-    print(mutual_info_regression(
-        mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
+    # print("\nExample scenario: n_p and P should have high MI:")
+    # print(mutual_info_regression(
+    #     mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
 
-    model_vals.append("AL_hist")
+    # model_vals.append("AL_hist")
 
-    print("")
-    print(model_vals, "vs AL:")
-    print(mutual_info_regression(mi_2003, mi_AL))
+    # print("")
+    # print(model_vals, "vs AL:")
+    # print(mutual_info_regression(mi_2003, mi_AL))
 
-    for i, feature in enumerate(model_vals):
-        print("\nMutual information for", feature, "vs the others:")
-        feature_array = model_vals.copy()
-        feature_array = np.delete(feature_array, i)
-        big_df = mi_2003.copy()
-        big_df = big_df.drop([feature], axis=1)
-        big_df = big_df.to_numpy()
-        small_df = mi_2003[feature]
-        small_df = small_df.to_numpy()
-        print(feature_array)
-        print(mutual_info_regression(big_df, small_df))
+    # for i, feature in enumerate(model_vals):
+    #     print("\nMutual information for", feature, "vs the others:")
+    #     feature_array = model_vals.copy()
+    #     feature_array = np.delete(feature_array, i)
+    #     big_df = mi_2003.copy()
+    #     big_df = big_df.drop([feature], axis=1)
+    #     big_df = big_df.to_numpy()
+    #     small_df = mi_2003[feature]
+    #     small_df = small_df.to_numpy()
+    #     print(feature_array)
+    #     print(mutual_info_regression(big_df, small_df))
 
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
@@ -378,13 +378,49 @@ def main():
 
     # ---------------------------------------------------------------
     # PERSISTENCE AND DISCRETIZATION (is that even a word)
-    
+
+    disc_array = []
+    pers_array = []
+    pers_index_array = []
+    # i.e. for each AL dataframe
+    for i, y in enumerate(y_array):
+        disc_y = y.rolling(30).min()  # roll right, 30 minute window
+        pers_y = disc_y.copy()
+        pers_y_index = pers_y.index
+        disc_y = disc_y.shift(-30)  # roll left for discrete AL
+
+        disc_y.dropna(axis='index', how='any', inplace=True)
+        pers_y.dropna(axis='index', how='any', inplace=True)
+        pers_y.drop(pers_y.tail(30).index, inplace=True)
+        disc_y.drop(disc_y.head(29).index, inplace=True)
+
+        pers_array.append(pers_y)
+        disc_array.append(disc_y)
+        pers_index_array.append(pers_y_index)
+
+    my_temp_X_array = []
+    for i, X in enumerate(X_array):
+        temp = X.copy()
+        temp.drop(temp.tail(30).index, inplace=True)
+        temp.drop(temp.head(29).index, inplace=True)
+        my_temp_X_array.append(temp)
+
+    X_array = my_temp_X_array
+
+    # TODO: make this less disgusting, copies vs views etc.
+
     # ---------------------------------------------------------------
-    # DROPPING USELESS PARAMETERS
+    # PARAMETERS CHANGES
+    
     # removing n_p - in the words of Mayur
     # "by far weakest correlation with AL and a strong correlation with P"
+    # also, adding persistence
+
     for i, X in enumerate(X_array):
-        X_array[i] = X.drop(["n_p"], axis=1)
+        X = X.drop(["n_p"], axis=1)
+        X.insert(5, "AL_hist", pers_array[i])
+        X_array[i] = X
+        print(X_array[i])
 
     # ---------------------------------------------------------------
     # INTERPOLATE AND DROPNA IN THE TEST STORMS
@@ -394,25 +430,29 @@ def main():
     index_array = []  # each storm will drop seperate dt, need to store indexes
 
     for i, X in enumerate(X_array):
-        X.insert(4, "AL", y_array[i])  # add AL back in
 
-        # interpolate the storm - pars AND AL in one go
+        # interpolate the storm
         interpolated_array.append(storm_interpolator(X))
 
         # store the new index for this storm, for later
         index_array.append(interpolated_array[i].index)
 
-    # seperate AL back out again!
-    for i, storm in enumerate(interpolated_array):
-        X_array[i] = storm[["B_X_GSM", "B_Y_GSM", "B_Z_GSM", "P", "V"]]
-        y_array[i] = storm["AL"]
+    for i, index in enumerate(index_array):
+        disc_array[i] = disc_array[i].loc[index[0]:index[-1]]
+        pers_array[i] = pers_array[i].loc[index[0]:index[-1]]
 
     print("Test storms interpolated.")
+
+    X_array = interpolated_array.copy()
+
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
     y_pred_array = []
-    for X in X_array:
-        y_pred_array.append(regr.predict(X))
+    for i, X in enumerate(X_array):
+        prediction = regr.predict(X)
+        pred_y = pd.DataFrame(
+            prediction, columns=["pred_AL"], index=index_array[i])
+        y_pred_array.append(pred_y)
 
     # ---------------------------------------------------------------
     # PLOTTING PREDICTED VS REAL (DISCRETIZED) AL
@@ -425,5 +465,15 @@ def main():
     #     plt.plot(index_array[i], y_array[i], label="Actual AL")
     #     plt.legend(loc='best')
 
+    # true, pred, pers
+
+    for i in range(0, len(disc_array)):
+        print("\n\n\n\n\n\n", storm_str_array[i])
+        print(disc_array[i])
+        print(y_pred_array[i])
+        print(pers_array[i])
+        
+        # print(storm_metrics(disc_array[i], y_pred_array[i], pers_array[i]))
+    
 
 main()
