@@ -27,26 +27,10 @@ def main():
     # ---------------------------------------------------------------
     # IMPORTING OCTOBER AND NOVEMBER SEPERATELY TO ZOOM IN
 
-    # pkl_dir = pathlib.Path('Data/OMNI/pickles')
-    # oct_nov_pkl_path = pkl_dir / 'oct_nov_2003.pkl'
-
-    # try:
-    #     df_oct_nov_2003 = pd.read_pickle((oct_nov_pkl_path))
-    #     print("Found the pickle for October and November 2003.")
-
-    # except FileNotFoundError:
-    #     print("Couldn't find the pickle for October and November 2003."
-    #           + "-> Generating one from the .asc files.")
-
-    #     print('Creating local directory at ', pkl_dir,
-    #           ' (if it doesn\'t already exist):')
-    #     pathlib.Path(pkl_dir).mkdir(exist_ok=True)
-    #     print("Done. Importing the data for October and November.")
-
-    #     df_oct_2003 = import_omni_month(2003, 10)
-    #     df_nov_2003 = import_omni_month(2003, 11)
-    #     df_oct_nov_2003 = pd.concat([df_oct_2003, df_nov_2003])
-    #     df_oct_nov_2003.to_pickle(oct_nov_pkl_path)  # store for future use
+    # df_oct_2003 = import_omni_month(2003, 10)
+    # df_nov_2003 = import_omni_month(2003, 11)
+    # df_oct_nov_2003 = pd.concat([df_oct_2003, df_nov_2003])
+    # df_oct_nov_2003.to_pickle(oct_nov_pkl_path)  # store for future use
 
     print("All 2003 data has been loaded.")
     # print("\n2003 data:")
@@ -98,7 +82,6 @@ def main():
     df_2003 = pd.DataFrame(arr_2003_scaled,
                            columns=df_2003_cols, index=df_2003_index)
     print("2003 data has been scaled.")
-    # print(df_2003)
 
     # scale AL
     scaler2 = StandardScaler()
@@ -109,8 +92,6 @@ def main():
 
     # need to add it back into a DF
     df_AL = pd.DataFrame(arr_AL_scaled, columns=['AL'], index=df_AL_index)
-    # print("\nAL after scaling\n")
-    # print(df_AL)
 
     # Add AL back in to the df
     df_2003.insert(4, "AL", arr_AL_scaled)
