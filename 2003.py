@@ -1,10 +1,9 @@
-import pathlib  # used for compatibility with non-POSIX systems
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt  # remember to run 'matplotlib tk'
+import pathlib  # used for compatibility with non-POSIX systems
 import datetime
 from tqdm import tqdm
-# remember to run 'matplotlib tk' in the interpreter
 
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
@@ -67,31 +66,72 @@ def main():
 
     # get just that data
     df_2003 = data_2003[model_vals]
-    df_2003_cols = df_2003.columns  # column labels
-    df_2003_index = df_2003.index  # row labels
 
+    # get the AL values separately
     df_AL = data_2003['AL']
-    df_AL_index = df_AL.index  # get the index (row labels), they are datetimes
 
-    # scale the main features
+    # ---------------------------------------------------------------
+    # PERSISTENCE TIME HISTORY OF AL
+
+    # Roll right, 30 minutes.
+    # E.g. 12:00-12:30 -> 12:30, 12:01-12:31 -> 12:31
+    disc_AL = df_AL.rolling(30).min()
+
+    # create a copy before shifting - this is for persistence model later
+    pers_AL = disc_AL.copy()
+    pers_AL_index = pers_AL.index
+
+    # now, for our y/target data, we do a roll left by shifting
+    # e.g. 12:00 <- 12:00-12:30, 12:01 <- 12:01-12:31
+    disc_AL = disc_AL.shift(-30)
+
+    # ---------------------------------------------------------------
+    # SOLUTION TO NAN ISSUES FROM TIMESHIFTING
+
+    # drop the nans in the last 30 elements of the discretized AL
+    disc_AL.dropna(axis='index', how='any', inplace=True)
+
+    # now, drop the last 30 minutes of all the other data so shapes stay equal
+    df_2003.drop(df_2003.tail(30).index, inplace=True)
+    pers_AL.drop(pers_AL.tail(30).index, inplace=True)
+
+    # for the persistence model, we do the same, but they'll drop from head
+    pers_AL.dropna(axis='index', how='any', inplace=True)
+
+    # drop the beginning 29 minutes of all other data to match (why 29? idk)
+    df_2003.drop(df_2003.head(29).index, inplace=True)
+    disc_AL.drop(disc_AL.head(29).index, inplace=True)
+
+    # ---------------------------------------------------------------
+    # ADD PERSISTENCE AS A FEATURE
+    df_2003.insert(6, "AL_hist", pers_AL)
+    model_vals.append("AL_hist")
+
+    # take cols and index for remaking DF after scaling
+    df_index = df_2003.index
+
+    # ---------------------------------------------------------------
+    # SCALE THE MAIN FEATURES
+
+    # fit the scaler, then transform the features
     scaler = StandardScaler()
     scaler = scaler.fit(df_2003)
     arr_2003_scaled = scaler.transform(df_2003)
 
     # need to add it back into a DF
     df_2003 = pd.DataFrame(arr_2003_scaled,
-                           columns=df_2003_cols, index=df_2003_index)
-    print("2003 data has been scaled.")
+                           columns=model_vals, index=df_index)
+    print("2003 features have been scaled.")
 
     # scale AL
     scaler2 = StandardScaler()
-    arr_AL = df_AL.to_numpy()
+    arr_AL = disc_AL.to_numpy()
     arr_AL = arr_AL.reshape(-1, 1)
     scaler2 = scaler2.fit(arr_AL)
     arr_AL_scaled = scaler2.transform(arr_AL)
 
     # need to add it back into a DF
-    df_AL = pd.DataFrame(arr_AL_scaled, columns=['AL'], index=df_AL_index)
+    disc_AL = pd.DataFrame(arr_AL_scaled, columns=['AL'], index=df_index)
 
     # ---------------------------------------------------------------
     # CORR AFTER STANDARDISATION
@@ -105,41 +145,12 @@ def main():
     # # drop AL again, don't want it as a feature anymore
     # df_2003 = df_2003.drop(["AL"], axis=1)
 
-    # ---------------------------------------------------------------
-    # PERSISTENCE TIME HISTORY OF AL
+    #########################################
 
-    # Roll right, 30 minutes.
-    # E.g. 12:00-12:30 -> 12:30, 12:01-12:31 -> 12:31
-    disc_AL = df_AL.rolling(30).min()
+    #########################################
 
-    # create a copy before shifting - this is for persistence model later
-    pers_AL = disc_AL.copy()
-    pers_AL_index = pers_AL.index
-
-    # now, because this isn't a native argument, we roll left by shifting
-    disc_AL = disc_AL.shift(-30)
-
-    # ---------------------------------------------------------------
-    # SOLUTION TO NAN ISSUES FROM TIMESHIFTING
-
-    # drop the nans in the last 30 elements of the discretized AL
-    disc_AL.dropna(axis='index', how='any', inplace=True)
-
-    # now, drop the last 30 minutes of all the other data so shapes stay equal
-    df_2003.drop(df_2003.tail(30).index, inplace=True)
-
-    # for the persistence model, we do the same, but they'll drop from head
-    pers_AL.dropna(axis='index', how='any', inplace=True)
-
-    # let's just do some bodging, so both should now match
-    df_2003.drop(df_2003.head(29).index, inplace=True)
-    pers_AL.drop(pers_AL.tail(30).index, inplace=True)
-    disc_AL.drop(disc_AL.head(29).index, inplace=True)
-
-    # ---------------------------------------------------------------
-    # ADD PERSISTENCE AS A FEATURE
-    df_2003.insert(6, "AL_hist", pers_AL)
-
+    #########################################
+    
     # ---------------------------------------------------------------
     # MUTUAL INFORMATION
 
@@ -168,8 +179,6 @@ def main():
     # print("\nExample scenario: n_p and P should have high MI:")
     # print(mutual_info_regression(
     #     mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
-
-    # model_vals.append("AL_hist")
 
     # print("")
     # print(model_vals, "vs AL:")
