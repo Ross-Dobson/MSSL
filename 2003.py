@@ -65,10 +65,10 @@ def main():
     model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
 
     # get just that data
-    df_2003 = data_2003[model_vals]
+    df_2003 = data_2003[model_vals].copy()
 
     # get the AL values separately
-    df_AL = data_2003['AL']
+    df_AL = data_2003['AL'].copy()
 
     # ---------------------------------------------------------------
     # PERSISTENCE TIME HISTORY OF AL
