@@ -48,17 +48,6 @@ def main():
         # df_oct_nov_2003.plot(x='DateTime', y=val, title=oct_nov_title)
 
     # ---------------------------------------------------------------
-    # CORRELATION MATRIX BEFORE SCALER
-
-    # print("\nCorrelation matrix before standardization:\n")
-    # corr_2003 = data_2003[plot_vals].corr()
-    # print(corr_2003)
-
-    # print("\nCorrelation matrix for October & November 2003\n")
-    # corr_oct_nov_2003 = df_oct_nov_2003[plot_vals].corr()
-    # print(corr_oct_nov_2003)
-
-    # ---------------------------------------------------------------
     # SCALER/TRANSFORMING THE DATA
 
     # The features we care about
@@ -111,46 +100,61 @@ def main():
     df_index = df_2003.index
 
     # ---------------------------------------------------------------
+    # CORRELATION MATRIX BEFORE SCALER
+
+    # add disc AL
+    df_2003.insert(7, "disc_AL", disc_AL)
+
+    # # This is obsolete, but commented here as a reminder of current state of
+    # # the dataframes
+    # # corr_pars = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V',
+    #              # 'AL_hist', 'disc_AL']
+
+    print("\nCorrelation matrix before standardization:\n")
+    print(df_2003.corr())
+
+    # print("\nCorrelation matrix for October & November 2003\n")
+    # corr_oct_nov_2003 = df_oct_nov_2003[plot_vals].corr()
+    # print(corr_oct_nov_2003)
+
+    # remove disc AL
+    df_2003 = df_2003.drop(["disc_AL"], axis=1)
+
+    # ---------------------------------------------------------------
     # SCALE THE MAIN FEATURES
 
     # fit the scaler, then transform the features
-    scaler = StandardScaler()
-    scaler = scaler.fit(df_2003)
-    arr_2003_scaled = scaler.transform(df_2003)
+    X_scaler = StandardScaler()
+    X_scaler = X_scaler.fit(df_2003)
+    X_scaled = X_scaler.transform(df_2003)
 
     # need to add it back into a DF
-    df_2003 = pd.DataFrame(arr_2003_scaled,
-                           columns=model_vals, index=df_index)
-    print("2003 features have been scaled.")
+    df_2003 = pd.DataFrame(X_scaled, columns=model_vals, index=df_index)
+    print("\n2003 features have been scaled.")
 
     # scale AL
-    scaler2 = StandardScaler()
+    y_scaler = StandardScaler()
     arr_AL = disc_AL.to_numpy()
     arr_AL = arr_AL.reshape(-1, 1)
-    scaler2 = scaler2.fit(arr_AL)
-    arr_AL_scaled = scaler2.transform(arr_AL)
+    y_scaler = y_scaler.fit(arr_AL)
+    y_scaled = y_scaler.transform(arr_AL)
 
     # need to add it back into a DF
-    disc_AL = pd.DataFrame(arr_AL_scaled, columns=['AL'], index=df_index)
+    disc_AL = pd.DataFrame(y_scaled, columns=['AL'], index=df_index)
+    print("2003 AL has been scaled.")
 
     # ---------------------------------------------------------------
     # CORR AFTER STANDARDISATION
 
-    # # Add AL back in to the df
-    # df_2003.insert(4, "AL", arr_AL_scaled)
+    # Add AL back in to the df
+    df_2003.insert(7, "disc_AL", y_scaled)
 
-    # print("\nCorr after standardization:\n")
-    # print(df_2003.corr())
+    print("\nCorrelation matrix after standardization:\n")
+    print(df_2003.corr())
 
-    # # drop AL again, don't want it as a feature anymore
-    # df_2003 = df_2003.drop(["AL"], axis=1)
+    # drop AL again, don't want it as a feature anymore
+    df_2003 = df_2003.drop(["disc_AL"], axis=1)
 
-    #########################################
-
-    #########################################
-
-    #########################################
-    
     # ---------------------------------------------------------------
     # MUTUAL INFORMATION
 
@@ -206,7 +210,7 @@ def main():
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     df_2003 = storm_interpolator(df_2003)
-    print("\n2003 data interpolated.")
+    print("\n2003 features interpolated.")
 
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
@@ -370,7 +374,7 @@ def main():
         y = storm['AL']
 
         # scale the main features
-        X_trans = scaler.transform(X)
+        X_trans = X_scaler.transform(X)
 
         # each storm's features to a df, append to X_array of dataframes
         X_array.append(pd.DataFrame(X_trans,
@@ -379,7 +383,7 @@ def main():
         # scale AL
         y = y.to_numpy()
         y = y.reshape(-1, 1)
-        y_trans = scaler2.transform(y)
+        y_trans = y_scaler.transform(y)
 
         # each storm's AL to a df, append to y_array of dataframes
         y_array.append(pd.DataFrame(y_trans,
