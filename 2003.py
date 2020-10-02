@@ -158,47 +158,47 @@ def main():
     # ---------------------------------------------------------------
     # MUTUAL INFORMATION
 
-    # print("\nMUTUAL INFORMATION:")
+    print("\nMUTUAL INFORMATION:")
 
-    # # 1 year data crashes. Lets use 1 week, centred on 24h storm
-    # storm_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)  # start of storm
-    # start_dt = storm_dt - datetime.timedelta(days=3)  # start of week: -3d
-    # end_dt = storm_dt + datetime.timedelta(days=4)  # end of week: +4d
+    # 1 year data crashes. Lets use 1 week, centred on 24h storm
+    storm_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)  # start of storm
+    start_dt = storm_dt - datetime.timedelta(days=3)  # start of week: -3d
+    end_dt = storm_dt + datetime.timedelta(days=4)  # end of week: +4d
 
-    # # make copy so we cant break anything
-    # mi_2003 = df_2003.copy()
+    # make copy so we cant break anything
+    mi_2003 = df_2003.copy()
 
-    # # reinsert AL for consistent NaN drop
-    # mi_2003.insert(7, 'disc_AL', disc_AL)
+    # reinsert AL for consistent NaN drop
+    mi_2003.insert(7, 'disc_AL', disc_AL)
 
-    # # narrow to week
-    # mi_2003 = mi_2003.loc[start_dt:end_dt]
+    # narrow to week
+    mi_2003 = mi_2003.loc[start_dt:end_dt]
 
-    # # drop NaNs, MI doesn't like them
-    # mi_2003.dropna(axis='index', how='any', inplace=True)
+    # drop NaNs, MI doesn't like them
+    mi_2003.dropna(axis='index', how='any', inplace=True)
 
-    # mi_AL = mi_2003['disc_AL']
-    # mi_2003 = mi_2003.drop(['disc_AL'], axis=1)
+    mi_AL = mi_2003['disc_AL']
+    mi_2003 = mi_2003.drop(['disc_AL'], axis=1)
 
-    # print("\nExample scenario: n_p and P should have high MI:")
-    # print(mutual_info_regression(
-    #     mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
+    print("\nExample scenario: n_p and P should have high MI:")
+    print(mutual_info_regression(
+        mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
 
-    # print("")
-    # print(model_vals, "vs AL:")
-    # print(mutual_info_regression(mi_2003, mi_AL))
+    print("")
+    print(model_vals, "vs AL:")
+    print(mutual_info_regression(mi_2003, mi_AL))
 
-    # for i, feature in enumerate(model_vals):
-    #     print("\nMutual information for", feature, "vs the others:")
-    #     feature_array = model_vals.copy()
-    #     feature_array = np.delete(feature_array, i)
-    #     big_df = mi_2003.copy()
-    #     big_df = big_df.drop([feature], axis=1)
-    #     big_df = big_df.to_numpy()
-    #     small_df = mi_2003[feature]
-    #     small_df = small_df.to_numpy()
-    #     print(feature_array)
-    #     print(mutual_info_regression(big_df, small_df))
+    for i, feature in enumerate(model_vals):
+        print("\nMutual information for", feature, "vs the others:")
+        feature_array = model_vals.copy()
+        feature_array = np.delete(feature_array, i)
+        big_df = mi_2003.copy()
+        big_df = big_df.drop([feature], axis=1)
+        big_df = big_df.to_numpy()
+        small_df = mi_2003[feature]
+        small_df = small_df.to_numpy()
+        print(feature_array)
+        print(mutual_info_regression(big_df, small_df))
 
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
@@ -285,8 +285,15 @@ def main():
     # EVALUATING OUR MODEL VS PERSISTENCE MODEL
 
     def storm_metrics(y_true, y_pred, y_pers):
-        """
-        Runs various regression metrics from sklearn.metrics
+        """Runs various regression metrics from sklearn.metrics
+ 
+        Args:
+          y_true: The target values of discrete rolled-left AL
+          y_pred: The predicted values of discrete rolled-left AL from model
+          y_pers: The persistence (rolled-right) time history of AL
+
+        Returns:
+          None
         """
         print("\nSTORM METRICS:")
 
