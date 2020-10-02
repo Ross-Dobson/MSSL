@@ -454,32 +454,30 @@ def main():
     # INTERPOLATE AND DROPNA IN THE TEST STORMS
     # have to add AL back in so that the dropped datetimes are consistent!
 
-    interpolated_array = []
-    index_array = []  # each storm will drop seperate dt, need to store indexes
+    week_index_array = []  # each storm will drop seperate dt, need to store
 
     for i, X in enumerate(X_array):
 
         # interpolate the storm
-        interpolated_array.append(storm_interpolator(X))
+        X_array[i] = storm_interpolator(X)
 
         # store the new index for this storm, for later
-        index_array.append(interpolated_array[i].index)
+        week_index_array.append(X_array[i].index)
 
-    for i, index in enumerate(index_array):
-        disc_array[i] = disc_array[i].loc[index[0]:index[-1]]
-        pers_array[i] = pers_array[i].loc[index[0]:index[-1]]
+    # quite proud of this bodge ngl
+    for i, index in enumerate(week_index_array):
+        y_array[i] = y_array[i].loc[index[0]:index[-1]]
 
-    print("Test storms interpolated.")
-
-    X_array = interpolated_array.copy()
+    print("\nTest storms interpolated.")
 
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
+
     y_pred_array = []
     for i, X in enumerate(X_array):
         prediction = regr.predict(X)
         pred_y = pd.DataFrame(
-            prediction, columns=["pred_AL"], index=index_array[i])
+            prediction, columns=["pred_AL"], index=week_index_array[i])
         y_pred_array.append(pred_y)
 
     # ---------------------------------------------------------------
