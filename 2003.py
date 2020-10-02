@@ -156,49 +156,49 @@ def main():
     df_2003 = df_2003.drop(["disc_AL"], axis=1)
 
     # ---------------------------------------------------------------
-    # MUTUAL INFORMATION
+    # # MUTUAL INFORMATION
 
-    print("\nMUTUAL INFORMATION:")
+    # print("\nMUTUAL INFORMATION:")
 
-    # 1 year data crashes. Lets use 1 week, centred on 24h storm
-    storm_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)  # start of storm
-    start_dt = storm_dt - datetime.timedelta(days=3)  # start of week: -3d
-    end_dt = storm_dt + datetime.timedelta(days=4)  # end of week: +4d
+    # # 1 year data crashes. Lets use 1 week, centred on 24h storm
+    # storm_dt = datetime.datetime(2003, 10, 27, 0, 0, 0)  # start of storm
+    # start_dt = storm_dt - datetime.timedelta(days=3)  # start of week: -3d
+    # end_dt = storm_dt + datetime.timedelta(days=4)  # end of week: +4d
 
-    # make copy so we cant break anything
-    mi_2003 = df_2003.copy()
+    # # make copy so we cant break anything
+    # mi_2003 = df_2003.copy()
 
-    # reinsert AL for consistent NaN drop
-    mi_2003.insert(7, 'disc_AL', disc_AL)
+    # # reinsert AL for consistent NaN drop
+    # mi_2003.insert(7, 'disc_AL', disc_AL)
 
-    # narrow to week
-    mi_2003 = mi_2003.loc[start_dt:end_dt]
+    # # narrow to week
+    # mi_2003 = mi_2003.loc[start_dt:end_dt]
 
-    # drop NaNs, MI doesn't like them
-    mi_2003.dropna(axis='index', how='any', inplace=True)
+    # # drop NaNs, MI doesn't like them
+    # mi_2003.dropna(axis='index', how='any', inplace=True)
 
-    mi_AL = mi_2003['disc_AL']
-    mi_2003 = mi_2003.drop(['disc_AL'], axis=1)
+    # mi_AL = mi_2003['disc_AL']
+    # mi_2003 = mi_2003.drop(['disc_AL'], axis=1)
 
-    print("\nExample scenario: n_p and P should have high MI:")
-    print(mutual_info_regression(
-        mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
+    # print("\nExample scenario: n_p and P should have high MI:")
+    # print(mutual_info_regression(
+    #     mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
 
-    print("")
-    print(model_vals, "vs AL:")
-    print(mutual_info_regression(mi_2003, mi_AL))
+    # print("")
+    # print(model_vals, "vs AL:")
+    # print(mutual_info_regression(mi_2003, mi_AL))
 
-    for i, feature in enumerate(model_vals):
-        print("\nMutual information for", feature, "vs the others:")
-        feature_array = model_vals.copy()
-        feature_array = np.delete(feature_array, i)
-        big_df = mi_2003.copy()
-        big_df = big_df.drop([feature], axis=1)
-        big_df = big_df.to_numpy()
-        small_df = mi_2003[feature]
-        small_df = small_df.to_numpy()
-        print(feature_array)
-        print(mutual_info_regression(big_df, small_df))
+    # for i, feature in enumerate(model_vals):
+    #     print("\nMutual information for", feature, "vs the others:")
+    #     feature_array = model_vals.copy()
+    #     feature_array = np.delete(feature_array, i)
+    #     big_df = mi_2003.copy()
+    #     big_df = big_df.drop([feature], axis=1)
+    #     big_df = big_df.to_numpy()
+    #     small_df = mi_2003[feature]
+    #     small_df = small_df.to_numpy()
+    #     print(feature_array)
+    #     print(mutual_info_regression(big_df, small_df))
 
     # ---------------------------------------------------------------
     # REMOVING USELESS PARAMETERS
@@ -366,10 +366,7 @@ def main():
     print("Validation storms imported successfully.")
 
     # ---------------------------------------------------------------
-    # STANDARD SCALING
-    # we use the same scalers we used earlier. Remember, "scaler" for features
-    # and "scaler2" for AL
-
+    # GET FEATURES DATA AND AL
     # The features we care about - recall, no persistence yet
     model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
 
@@ -377,70 +374,81 @@ def main():
     y_array = []
     for i, storm in enumerate(storm_array):
         storm_index = storm.index  # save this for reconstructing DF later
-        X = storm[model_vals]
-        y = storm['AL']
-
-        # scale the main features
-        X_trans = X_scaler.transform(X)
+        X = storm[model_vals].copy()
+        y = storm['AL'].copy()
 
         # each storm's features to a df, append to X_array of dataframes
-        X_array.append(pd.DataFrame(X_trans,
-                                    columns=df_2003_cols, index=storm_index))
-
-        # scale AL
-        y = y.to_numpy()
-        y = y.reshape(-1, 1)
-        y_trans = y_scaler.transform(y)
-
-        # each storm's AL to a df, append to y_array of dataframes
-        y_array.append(pd.DataFrame(y_trans,
-                                    columns=['AL'], index=storm_index))
+        X_array.append(pd.DataFrame(X, columns=model_vals, index=storm_index))
+        y_array.append(pd.DataFrame(y, columns=['AL'], index=storm_index))
 
     # ---------------------------------------------------------------
     # PERSISTENCE AND DISCRETIZATION (is that even a word)
 
     disc_array = []
     pers_array = []
-    pers_index_array = []
+    df_index_array = []
     # i.e. for each AL dataframe
     for i, y in enumerate(y_array):
         disc_y = y.rolling(30).min()  # roll right, 30 minute window
         pers_y = disc_y.copy()
-        pers_y_index = pers_y.index
         disc_y = disc_y.shift(-30)  # roll left for discrete AL
 
+        # drop the 30 minutes of NaNs from the shifting
         disc_y.dropna(axis='index', how='any', inplace=True)
         pers_y.dropna(axis='index', how='any', inplace=True)
+
+        # make the two match up
         pers_y.drop(pers_y.tail(30).index, inplace=True)
         disc_y.drop(disc_y.head(29).index, inplace=True)
 
+        # add to the master arrays
         pers_array.append(pers_y)
         disc_array.append(disc_y)
-        pers_index_array.append(pers_y_index)
 
-    my_temp_X_array = []
+        # the indexes to remake the DF after scaling
+        df_index_array.append(disc_y.index)
+
     for i, X in enumerate(X_array):
-        temp = X.copy()
-        temp.drop(temp.tail(30).index, inplace=True)
-        temp.drop(temp.head(29).index, inplace=True)
-        my_temp_X_array.append(temp)
+        X.drop(X.tail(30).index, inplace=True)
+        X.drop(X.head(29).index, inplace=True)
 
-    X_array = my_temp_X_array
+        # ADD PERSISTENCE AS A FEATURE
+        X.insert(6, "AL_hist", pers_array[i].to_numpy())
+        X_array[i] = X
 
-    # TODO: make this less disgusting, copies vs views etc.
+    # outside the for loop so we dont add it more than once!
+    model_vals.append("AL_hist")
+
+    # ---------------------------------------------------------------
+    # STANDARD SCALING
+    # we use the same scalers we used earlier. X_scaler and y_scaler
+
+    for i, storm_index in enumerate(df_index_array):
+        # scale the main features
+        X_trans = X_scaler.transform(X_array[i])
+
+        # each storm's features to a df, append to X_array of dataframes
+        X_array[i] = pd.DataFrame(X_trans,
+                                  columns=model_vals, index=storm_index)
+
+        # scale AL
+        y = disc_array[i].to_numpy()
+        y = y.reshape(-1, 1)
+        y_trans = y_scaler.transform(y)
+
+        # each storm's AL to a df, append to y_array of dataframes
+        y_array[i] = pd.DataFrame(y_trans, columns=['AL'], index=storm_index)
 
     # ---------------------------------------------------------------
     # PARAMETERS CHANGES
-    
+
     # removing n_p - in the words of Mayur
     # "by far weakest correlation with AL and a strong correlation with P"
     # also, adding persistence
 
     for i, X in enumerate(X_array):
         X = X.drop(["n_p"], axis=1)
-        X.insert(5, "AL_hist", pers_array[i])
         X_array[i] = X
-        print(X_array[i])
 
     # ---------------------------------------------------------------
     # INTERPOLATE AND DROPNA IN THE TEST STORMS
