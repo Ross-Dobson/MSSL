@@ -154,14 +154,13 @@ def import_omni_month(year, month, resolution='1min', cols='All'):
 
 def leapcheck(year):
     '''Calculate whether the year is a leap year, return a True/False.
+    TBH I based this off psuedo-code from Wikipedia.
 
     Args:
       year: Integer of the year to check
 
     Returns:
       A boolean True/False on whether the year is a leap year.
-
-    TBH I based this off psuedo-code from Wikipedia!
     '''
     leap_year = False
     if(year % 4 != 0):  # has to be divisible by 4
