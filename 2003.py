@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt  # remember to run 'matplotlib tk'
 import pathlib  # used for compatibility with non-POSIX systems
 import datetime
-from tqdm import tqdm
 
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
@@ -38,14 +37,14 @@ def main():
     # ---------------------------------------------------------------
     # PLOTTING THE PARAMETERS
 
-    plot_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V', 'AL']
+    # plot_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V', 'AL']
 
     # for val in plot_vals:
-        # year_title = str(val) + ' in ' + str(year)
-        # data_2003.plot(x='DateTime', y=val, title=year_title)
+    #    # year_title = str(val) + ' in ' + str(year)
+    #    # data_2003.plot(x='DateTime', y=val, title=year_title)
 
-        # oct_nov_title = str(val) + ' in October and November 2003'
-        # df_oct_nov_2003.plot(x='DateTime', y=val, title=oct_nov_title)
+    #    # oct_nov_title = str(val) + ' in October and November 2003'
+    #    # df_oct_nov_2003.plot(x='DateTime', y=val, title=oct_nov_title)
 
     # ---------------------------------------------------------------
     # SCALER/TRANSFORMING THE DATA
@@ -102,23 +101,23 @@ def main():
     # ---------------------------------------------------------------
     # CORRELATION MATRIX BEFORE SCALER
 
-    # add disc AL
-    df_2003.insert(7, "disc_AL", disc_AL)
+    # # add disc AL
+    # df_2003.insert(7, "disc_AL", disc_AL)
 
-    # # This is obsolete, but commented here as a reminder of current state of
-    # # the dataframes
-    # # corr_pars = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V',
-    #              # 'AL_hist', 'disc_AL']
+    # # # This is obsolete, but commented here as reminder of current state of
+    # # # the dataframes
+    # # # corr_pars = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V',
+    # #              # 'AL_hist', 'disc_AL']
 
-    print("\nCorrelation matrix before standardization:\n")
-    print(df_2003.corr())
+    # print("\nCorrelation matrix before standardization:\n")
+    # print(df_2003.corr())
 
-    # print("\nCorrelation matrix for October & November 2003\n")
-    # corr_oct_nov_2003 = df_oct_nov_2003[plot_vals].corr()
-    # print(corr_oct_nov_2003)
+    # # print("\nCorrelation matrix for October & November 2003\n")
+    # # corr_oct_nov_2003 = df_oct_nov_2003[plot_vals].corr()
+    # # print(corr_oct_nov_2003)
 
-    # remove disc AL
-    df_2003 = df_2003.drop(["disc_AL"], axis=1)
+    # # remove disc AL
+    # df_2003 = df_2003.drop(["disc_AL"], axis=1)
 
     # ---------------------------------------------------------------
     # SCALE THE MAIN FEATURES
@@ -144,16 +143,16 @@ def main():
     print("2003 AL has been scaled.")
 
     # ---------------------------------------------------------------
-    # CORR AFTER STANDARDISATION
+    # # CORR AFTER STANDARDISATION
 
-    # Add AL back in to the df
-    df_2003.insert(7, "disc_AL", y_scaled)
+    # # Add AL back in to the df
+    # df_2003.insert(7, "disc_AL", y_scaled)
 
-    print("\nCorrelation matrix after standardization:\n")
-    print(df_2003.corr())
+    # print("\nCorrelation matrix after standardization:\n")
+    # print(df_2003.corr())
 
-    # drop AL again, don't want it as a feature anymore
-    df_2003 = df_2003.drop(["disc_AL"], axis=1)
+    # # drop AL again, don't want it as a feature anymore
+    # df_2003 = df_2003.drop(["disc_AL"], axis=1)
 
     # ---------------------------------------------------------------
     # # MUTUAL INFORMATION
@@ -210,6 +209,7 @@ def main():
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
     df_2003 = storm_interpolator(df_2003)
+
     print("\n2003 features interpolated.")
 
     # ---------------------------------------------------------------
@@ -273,10 +273,12 @@ def main():
     happy_index = y_test_index[(y_test_index >= earliest_dt)
                                & (y_test_index <= latest_dt)]
 
-    test_df = pd.DataFrame(
-        y_test.loc[happy_index], columns=['AL'], index=happy_index)
+    # If running metrics on 2003 data, this would be what you used
+    # Leaving here as reference so easier to generate for other storms
+    # test_df = pd.DataFrame(
+    #     y_test.loc[happy_index], columns=['AL'], index=happy_index)
 
-    pred_df = y_pred.loc[happy_index]
+    # pred_df = y_pred.loc[happy_index]
 
     pers_df = pd.DataFrame(pers_AL, columns=['AL'], index=pers_AL_index)
     pers_df = pers_df.loc[happy_index]
@@ -286,7 +288,7 @@ def main():
 
     def storm_metrics(y_true, y_pred, y_pers):
         """Runs various regression metrics from sklearn.metrics
- 
+
         Args:
           y_true: The target values of discrete rolled-left AL
           y_pred: The predicted values of discrete rolled-left AL from model
@@ -423,6 +425,7 @@ def main():
     # STANDARD SCALING
     # we use the same scalers we used earlier. X_scaler and y_scaler
 
+    y_array = []  # this is really, really bad practice...
     for i, storm_index in enumerate(df_index_array):
         # scale the main features
         X_trans = X_scaler.transform(X_array[i])
@@ -437,7 +440,8 @@ def main():
         y_trans = y_scaler.transform(y)
 
         # each storm's AL to a df, append to y_array of dataframes
-        y_array[i] = pd.DataFrame(y_trans, columns=['AL'], index=storm_index)
+        y_array.append(pd.DataFrame(
+            y_trans, columns=['AL'], index=storm_index))
 
     # ---------------------------------------------------------------
     # PARAMETERS CHANGES
@@ -465,9 +469,13 @@ def main():
         week_index_array.append(X_array[i].index)
 
     # quite proud of this bodge ngl
-    for i, index in enumerate(week_index_array):
-        y_array[i] = y_array[i].loc[index[0]:index[-1]]
-
+    # for i, index in enumerate(week_index_array):
+        # y_array[i] = y_array[i].loc[index[0]:index[-1]]
+        # print("\n\n")
+        # print(X_array[i])
+        # print(X_array[i].loc[index[0]:index[-1]])
+        # print(y_array[i].loc[index[0]:index[-1]])
+        
     print("\nTest storms interpolated.")
 
     # ---------------------------------------------------------------
@@ -481,25 +489,17 @@ def main():
         y_pred_array.append(pred_y)
 
     # ---------------------------------------------------------------
-    # PLOTTING PREDICTED VS REAL (DISCRETIZED) AL
+    # CHUNKING INTO ONE HOUR
 
-    # # Plot the predicted data vs our discretized AL
-    # for i in range(0, len(y_array)):
-    #     plt.figure()
-    #     plt.title("Storm from " + storm_str_array[i])
-    #     plt.plot(index_array[i], y_pred_array[i], label="Predicted AL")
-    #     plt.plot(index_array[i], y_array[i], label="Actual AL")
-    #     plt.legend(loc='best')
+    # for i, X in enumerate(X_array):
+        # print("\n\n\ni")
+        # print("Features X array:", len(X_array[i]))
+        # print("Target y array:", len(y_array[i]))
+        # print("Model f(x) array:", len(y_pred_array[i]))
+        # print("Persistence array:", len(X_array[i]['AL_hist']))
+    # ---------------------------------------------------------------
+    # PLOTTING
+    # need to update storm_metrics to return the metrics as array of values
 
-    # true, pred, pers
-
-    for i in range(0, len(disc_array)):
-        print("\n\n\n\n\n\n", storm_str_array[i])
-        print(disc_array[i])
-        print(y_pred_array[i])
-        print(pers_array[i])
-        
-        # print(storm_metrics(disc_array[i], y_pred_array[i], pers_array[i]))
-    
 
 main()
