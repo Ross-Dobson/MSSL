@@ -261,9 +261,9 @@ def import_storm_week(year, month, day):
 def storm_interpolator(my_df):
     """Straight-line interpolates gaps (NaNs) less than 15 minutes.
     After that, it just removes any remaining NaNs inplace."""
-    df_resampled = my_df.resample(
-        '1T', loffset=datetime.timedelta(seconds=30.)).mean()
-    df_resampled = df_resampled.interpolate(method='linear', limit=15)
+    # df_resampled = my_df.resample(
+    #     '1T', loffset=datetime.timedelta(seconds=30.)).mean()
+    df_resampled = my_df.interpolate(method='linear', limit=15)
     df_resampled.dropna(axis='index', how='any', inplace=True)
 
     return df_resampled
