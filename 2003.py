@@ -242,8 +242,10 @@ def main():
         fold_counter += 1
 
     print("Folding complete.")
+
     # ---------------------------------------------------------------
     # LINEAR REGRESSION
+
     # create the linear regression object
     regr = LinearRegression()
 
@@ -260,6 +262,7 @@ def main():
     # put y pred back in a dataframe, just makes life easier for future
     y_test_index = y_test.index
     y_pred = pd.DataFrame(y_pred, columns=['pred_AL'], index=y_test_index)
+
     # ---------------------------------------------------------------
     # MAKING PERSISTENCE MATCH
 
@@ -427,6 +430,7 @@ def main():
 
     y_array = []  # this is really, really bad practice...
     for i, storm_index in enumerate(df_index_array):
+
         # scale the main features
         X_trans = X_scaler.transform(X_array[i])
 
@@ -444,11 +448,8 @@ def main():
             y_trans, columns=['AL'], index=storm_index))
 
     # ---------------------------------------------------------------
-    # PARAMETERS CHANGES
-
-    # removing n_p - in the words of Mayur
+    # REMOVING N_P
     # "by far weakest correlation with AL and a strong correlation with P"
-    # also, adding persistence
 
     for i, X in enumerate(X_array):
         X = X.drop(["n_p"], axis=1)
@@ -456,9 +457,10 @@ def main():
 
     # ---------------------------------------------------------------
     # INTERPOLATE AND DROPNA IN THE TEST STORMS
-    # have to add AL back in so that the dropped datetimes are consistent!
+    # remember, no longer need to interpolate y because its discretized
 
-    week_index_array = []  # each storm will drop seperate dt, need to store
+    # each storm will drop seperate dt, so store index to remake df
+    week_index_array = []
 
     for i, X in enumerate(X_array):
 
@@ -468,18 +470,15 @@ def main():
         # store the new index for this storm, for later
         week_index_array.append(X_array[i].index)
 
-    # quite proud of this bodge ngl
-    # for i, index in enumerate(week_index_array):
-        # y_array[i] = y_array[i].loc[index[0]:index[-1]]
-        # print("\n\n")
-        # print(X_array[i])
-        # print(X_array[i].loc[index[0]:index[-1]])
-        # print(y_array[i].loc[index[0]:index[-1]])
-        
+    # make sure y matches the X index (ie match the dropped points)
+    for i, index in enumerate(week_index_array):
+        y_array[i] = y_array[i].loc[index]
+
     print("\nTest storms interpolated.")
 
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
+    # remember we fitted the LinearRegression object regr on 2003 data
 
     y_pred_array = []
     for i, X in enumerate(X_array):
@@ -491,15 +490,64 @@ def main():
     # ---------------------------------------------------------------
     # CHUNKING INTO ONE HOUR
 
-    # for i, X in enumerate(X_array):
-        # print("\n\n\ni")
-        # print("Features X array:", len(X_array[i]))
-        # print("Target y array:", len(y_array[i]))
-        # print("Model f(x) array:", len(y_pred_array[i]))
-        # print("Persistence array:", len(X_array[i]['AL_hist']))
-    # ---------------------------------------------------------------
-    # PLOTTING
-    # need to update storm_metrics to return the metrics as array of values
+    def storm_chunker(y_true, y_pred, y_pers, resolution='1h'):
+        """
+        Splits the storm into chunks of timesteps (only 1 hour implemented)
+        If there's any gaps due to removed NaNs, it just means that hour will 
+        have slightly less datapoints in it. E.g. the borders of the chunk will
+        still be 60 minutes apart, if not 60 datapoints apart.
+
+        Args:
+          y_true: the AL of true (discretized) AL to compare against
+          y_pred: the predicted values of AL from the model
+          y_pers: the persistence/AL history values
+
+        Returns:
+          chunks: array of 3-col dfs, each col is true, pred, pers
+        """
+
+        first_dt = y_true.index[0]  # start_dt cannot precede this 
+        limit_dt = y_true.index[-1]  # end_dt cannot exceed this
+
+        year = int(first_dt.strftime("%Y"))
+        month = int(first_dt.strftime("%m"))
+        day = int(first_dt.strftime("%d"))
+        hour = int(first_dt.strftime("%H"))
+
+        # set it to the first (hopefully) full hour
+        if (resolution=='1h'):
+            start_dt = datetime.datetime(year, month, day, int(hour)+1, 0)
+            end_dt = start_dt + datetime.timedelta(minutes=59)
+
+        chunks = []
+        while (end_dt <= limit_dt):
+
+            # get the chunk
+            true_chunk = y_true.loc[start_dt:end_dt]
+            pers_chunk = y_pers.loc[start_dt:end_dt]
+            pred_chunk = y_pred.loc[start_dt:end_dt]
+            chunk_index = true_chunk.index
+
+            # make one df for all three, append
+            chunks.append(pd.dateframe(
+                [true_chunk, pred_chunk, pers_chunk],
+                columns=['AL_true', 'AL_pred', 'AL_pers'], index=chunk_index))
+
+            # by iterating hours=1, we can keep the XX:00 -> XX:59 spacing intact
+            start_dt += datetime.timedelta(hours=1)
+            end_dt += datetime.timedelta(hours=1)
+
+        # now that every chunk for this storm is generated, return
+        return chunks
+
+    # will store the array of chunks for each of the storms
+    chunks_array = []
+    for i in range(0,len(storm_array)):
+        print(storm_str_array[i], "\n")
+
+        # call the storm_chunker function to get array of chunks
+        chunks_array.append(
+            storm_chunker(y_array[i], y_pred_array[i], X_array[i]['AL_hist']))
 
 
 main()
