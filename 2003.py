@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt  # remember to run 'matplotlib tk'
+import matplotlib.dates as dt
 import pathlib  # used for compatibility with non-POSIX systems
 import datetime
 
@@ -300,22 +301,29 @@ def main():
         Returns:
           None
         """
-        print("\nSTORM METRICS:")
+        # print("\nSTORM METRICS:")
 
-        print("\nExplained variance score (higher is better, best 1.0):")
-        print("Discretized AL:",
-              explained_variance_score(y_true, y_pred))
-        print("Persistence AL:",
-              explained_variance_score(y_true, y_pers))
+        my_array = []
+        # print("\nExplained variance score (higher is better, best 1.0):")
+        # print("Discretized AL:",
+              # explained_variance_score(y_true, y_pred))
+        # print("Persistence AL:",
+              # explained_variance_score(y_true, y_pers))
+        my_array.append(explained_variance_score(y_true, y_pred))
+        my_array.append(explained_variance_score(y_true, y_pers))
 
-        print("\nMean absolute error (lower is better, best 0.0):")
-        print("Discretized AL:", mean_absolute_error(y_true, y_pred))
-        print("Persistence AL:", mean_absolute_error(y_true, y_pers))
-
-        print("\nMean squared error (lower is better, best 0.0):")
-        print("Discretized AL:", mean_squared_error(y_true, y_pred))
-        print("Persistence AL:", mean_squared_error(y_true, y_pers))
-
+        # print("\nMean absolute error (lower is better, best 0.0):")
+        # print("Discretized AL:", mean_absolute_error(y_true, y_pred))
+        # print("Persistence AL:", mean_absolute_error(y_true, y_pers))
+        my_array.append(mean_absolute_error(y_true, y_pred))
+        my_array.append(mean_absolute_error(y_true, y_pers))
+        
+        # print("\nMean squared error (lower is better, best 0.0):")
+        # print("Discretized AL:", mean_squared_error(y_true, y_pred))
+        # print("Persistence AL:", mean_squared_error(y_true, y_pers))
+        my_array.append(mean_squared_error(y_true, y_pred))
+        my_array.append(mean_squared_error(y_true, y_pers))
+        
         # this penalizes underpreciction more than overprediction
         # Mean squared logarithmic error (lower is better, best 0.0)
         # Penalizes underpreciction better. Good for exponential growth.
@@ -326,17 +334,34 @@ def main():
         #     y_true, y_pers))
 
         # not too affected by outliers - good choice of metric?
-        print("\nMedian absolute error (lower is better, best 0.0):")
-        print("Discretized AL:", median_absolute_error(
-            y_true, y_pred))
-        print("Persistence AL:", median_absolute_error(
-            y_true, y_pers))
+        # print("\nMedian absolute error (lower is better, best 0.0):")
+        # print("Discretized AL:", median_absolute_error(
+            # y_true, y_pred))
+        # print("Persistence AL:", median_absolute_error(
+            # y_true, y_pers))
+        my_array.append(median_absolute_error(y_true, y_pred))
+        my_array.append(median_absolute_error(y_true, y_pers))
 
         # variance is dependent on dataset, might be a pitfall
-        print("\nR2 coefficient of determination (higher=better), best 1)")
-        print("Discretized AL:", r2_score(y_true, y_pred))
-        print("Persistence AL:", r2_score(y_true, y_pers))
+        # print("\nR2 coefficient of determination (higher=better), best 1)")
+        # print("Discretized AL:", r2_score(y_true, y_pred))
+        # print("Persistence AL:", r2_score(y_true, y_pers))
+        my_array.append(r2_score(y_true, y_pred))
+        my_array.append(r2_score(y_true, y_pers))
+        
+        return my_array
 
+    metrics = ["Explained variance score",
+               "Mean absolute error",
+               "Mean squared error",
+               "Median absolute error",
+               "R2 score"]
+
+    metrics_desc = ["higher is better, best 1.0",
+                    "lower is better, best 0.0",
+                    "lower is better, best 0.0",
+                    "lower is better, best 0.0",
+                    "best value is 1"]
     # 2003 data - don't actually want to run metrics on this though
     # storm_metrics(test_df, pred_df, pers_df)
 
@@ -367,6 +392,18 @@ def main():
                        "2005-08-31 to 2005-09-01",
                        "2010-04-05 to 2010-04-06",
                        "2011-08-05 to 2011-08-06"]
+
+    storm_start_array = [datetime.datetime(2006, 12, 14, 12, 0, 0),
+                         datetime.datetime(2001, 8, 31, 0, 0, 0),
+                         datetime.datetime(2005, 8, 31, 10, 0, 0),
+                         datetime.datetime(2010, 4, 5, 0, 0, 0),
+                         datetime.datetime(2011, 8, 5, 9, 0, 0)]
+
+    storm_end_array = [datetime.datetime(2006, 12, 16, 0, 0, 0),
+                       datetime.datetime(2001, 9, 1, 0, 0, 0),
+                       datetime.datetime(2005, 9, 1, 12, 0, 0),
+                       datetime.datetime(2010, 4, 6, 0, 0, 0),
+                       datetime.datetime(2011, 8, 6, 0, 0, 0)]
 
     print("Validation storms imported successfully.")
 
@@ -526,28 +563,114 @@ def main():
             true_chunk = y_true.loc[start_dt:end_dt]
             pers_chunk = y_pers.loc[start_dt:end_dt]
             pred_chunk = y_pred.loc[start_dt:end_dt]
+
             chunk_index = true_chunk.index
 
             # make one df for all three, append
-            chunks.append(pd.dateframe(
-                [true_chunk, pred_chunk, pers_chunk],
-                columns=['AL_true', 'AL_pred', 'AL_pers'], index=chunk_index))
+            chunks.append(pd.concat(
+                [true_chunk, pred_chunk, pers_chunk], axis=1, sort=False))
 
-            # by iterating hours=1, we can keep the XX:00 -> XX:59 spacing intact
+            # by iterating hours=1, we keep the XX:00 -> XX:59 spacing intact
             start_dt += datetime.timedelta(hours=1)
             end_dt += datetime.timedelta(hours=1)
+
 
         # now that every chunk for this storm is generated, return
         return chunks
 
     # will store the array of chunks for each of the storms
     chunks_array = []
+    print("\nChunking storms:")
     for i in range(0,len(storm_array)):
-        print(storm_str_array[i], "\n")
+        print(storm_str_array[i])
 
         # call the storm_chunker function to get array of chunks
         chunks_array.append(
             storm_chunker(y_array[i], y_pred_array[i], X_array[i]['AL_hist']))
+
+    print("\nValidation storms have been chunked.")
+
+    # ---------------------------------------------------------------
+    # CALCULATING THE METRICS FOR EACH CHUNK
+
+    # iterate through each storm
+    for i,storm in enumerate(chunks_array):
+
+        # 10 - pred then pers of each 5 metrics (5 lots of 2)
+        metrics_array = [[],[],[],[],[],[],[],[],[],[]]
+
+        # index array to plot metric against
+        index_array = []
+        
+        # for each 1 hour chunk
+        for chunk in storm:
+
+            # run the metrics
+            if (len(chunk) != 0):
+
+                temp_metrics = storm_metrics(
+                    chunk['AL'],chunk['pred_AL'],chunk['AL_hist'])
+                
+                # append it into our array
+                for j in range(0, len(temp_metrics)):
+                    metrics_array[j].append(temp_metrics[j])
+
+                # also, get the index
+                index_array.append(chunk['AL'].index[0].to_numpy())
+
+        # OKAY lets get plotting for each metric!
+
+        for j in range(0,5):
+            a = 2*j
+            b = a+1
+
+            plt.figure()
+            plt.title(metrics[j] + " " + storm_str_array[j])
+
+            plt.plot(index_array, metrics_array[a], label='Model')
+            plt.plot(index_array, metrics_array[b], label='Persistence')
+            plt.axvline(storm_start_array[i], c='k', ls='--',
+                        label='Storm period')
+            plt.axvline(storm_end_array[i], c='k', ls='--')
+            plt.ylabel('Metric score: ' + metrics_desc[i])
+            plt.xlabel('DateTime')
+
+            old_ylim = plt.ylim()
+            new_low = old_ylim[0]
+            new_top = old_ylim[1]
+            
+            
+            print("\n")
+            print("old_top:", new_top)
+            print("old_low:", new_low)
+
+            amax = np.amax(metrics_array[a])
+            bmax = np.amax(metrics_array[b])
+            amin = np.amin(metrics_array[a])
+            bmin = np.amin(metrics_array[b])
+
+            if (new_low <= -10):
+                if amin <= bmin and amin>= -10:
+                    new_low = 1.5*amin
+                elif bmin <= amin and bmin >= -10:
+                    new_low = 1.5*bmin
+                else:
+                    new_low = -10
+
+            if (new_top >= 10):
+                if amax >= bmax and amax<= 10:
+                    new_top = 1.5*amax
+                elif bmin <= amin and amin <= 10:
+                    new_top = 1.5*bmax
+                else:
+                    new_top = 10
+
+            print("new_top:", new_top)
+            print("new_low:", new_low)
+
+            plt.ylim((new_low, new_top))
+            print(j, plt.ylim())
+            plt.legend(loc='best')
 
 
 main()
