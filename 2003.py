@@ -302,27 +302,31 @@ def main():
           None
         """
         # print("\nSTORM METRICS:")
-
-        my_array = []
+        
         # print("\nExplained variance score (higher is better, best 1.0):")
         # print("Discretized AL:",
               # explained_variance_score(y_true, y_pred))
         # print("Persistence AL:",
               # explained_variance_score(y_true, y_pers))
-        my_array.append(explained_variance_score(y_true, y_pred))
-        my_array.append(explained_variance_score(y_true, y_pers))
+        evs_true = explained_variance_score(y_true, y_pred)
+        evs_pers = explained_variance_score(y_true, y_pers)
+
+        if(evs_true > 1):
+            print("evs_true")
+        if(evs_pers >1):
+            print("evs_pers")
 
         # print("\nMean absolute error (lower is better, best 0.0):")
         # print("Discretized AL:", mean_absolute_error(y_true, y_pred))
         # print("Persistence AL:", mean_absolute_error(y_true, y_pers))
-        my_array.append(mean_absolute_error(y_true, y_pred))
-        my_array.append(mean_absolute_error(y_true, y_pers))
+        mean_true = mean_absolute_error(y_true, y_pred)
+        mean_pers = mean_absolute_error(y_true, y_pers)
         
         # print("\nMean squared error (lower is better, best 0.0):")
         # print("Discretized AL:", mean_squared_error(y_true, y_pred))
         # print("Persistence AL:", mean_squared_error(y_true, y_pers))
-        my_array.append(mean_squared_error(y_true, y_pred))
-        my_array.append(mean_squared_error(y_true, y_pers))
+        mse_true = mean_squared_error(y_true, y_pred)
+        mse_pers = mean_squared_error(y_true, y_pers)
         
         # this penalizes underpreciction more than overprediction
         # Mean squared logarithmic error (lower is better, best 0.0)
@@ -339,17 +343,22 @@ def main():
             # y_true, y_pred))
         # print("Persistence AL:", median_absolute_error(
             # y_true, y_pers))
-        my_array.append(median_absolute_error(y_true, y_pred))
-        my_array.append(median_absolute_error(y_true, y_pers))
+        medi_true = median_absolute_error(y_true, y_pred)
+        medi_pers = median_absolute_error(y_true, y_pers)
 
         # variance is dependent on dataset, might be a pitfall
         # print("\nR2 coefficient of determination (higher=better), best 1)")
         # print("Discretized AL:", r2_score(y_true, y_pred))
         # print("Persistence AL:", r2_score(y_true, y_pers))
-        my_array.append(r2_score(y_true, y_pred))
-        my_array.append(r2_score(y_true, y_pers))
+        r2_true = r2_score(y_true, y_pred)
+        r2_pers = r2_score(y_true, y_pers)
+
+        if (r2_true > 1):
+            print("r2_true")
+        if (r2_pers > 1):
+            print("r2_pers")
         
-        return my_array
+        return evs_true, evs_pers, mean_true, mean_pers, mse_true, mse_pers, medi_true, medi_pers, r2_true, r2_pers
 
     metrics = ["Explained variance score",
                "Mean absolute error",
@@ -594,14 +603,13 @@ def main():
     # CALCULATING THE METRICS FOR EACH CHUNK
 
     # iterate through each storm
-    for i,storm in enumerate(chunks_array):
+    for i, storm in enumerate(chunks_array):
 
-        # 10 - pred then pers of each 5 metrics (5 lots of 2)
-        metrics_array = [[],[],[],[],[],[],[],[],[],[]]
+        metrics_array = [[], [], [], [], [], [], [], [], [], []]
 
         # index array to plot metric against
         index_array = []
-        
+
         # for each 1 hour chunk
         for chunk in storm:
 
@@ -609,8 +617,9 @@ def main():
             if (len(chunk) != 0):
 
                 temp_metrics = storm_metrics(
-                    chunk['AL'],chunk['pred_AL'],chunk['AL_hist'])
-                
+                    chunk['AL'], chunk['pred_AL'], chunk['AL_hist'])
+                # print(temp_metrics)
+
                 # append it into our array
                 for j in range(0, len(temp_metrics)):
                     metrics_array[j].append(temp_metrics[j])
@@ -620,19 +629,20 @@ def main():
 
         # OKAY lets get plotting for each metric!
 
-        for j in range(0,5):
+        for j in range(0, 5):
             a = 2*j
             b = a+1
 
             plt.figure()
-            plt.title(metrics[j] + " " + storm_str_array[j])
+            plt.title(metrics[j] + " " + storm_str_array[i])
 
             plt.plot(index_array, metrics_array[a], label='Model')
             plt.plot(index_array, metrics_array[b], label='Persistence')
             plt.axvline(storm_start_array[i], c='k', ls='--',
                         label='Storm period')
             plt.axvline(storm_end_array[i], c='k', ls='--')
-            plt.ylabel('Metric score: ' + metrics_desc[i])
+            plt.axhline(0, c='k', alpha=0.5, ls='dotted')
+            plt.ylabel('Metric score: ' + metrics_desc[j])
             plt.xlabel('DateTime')
 
             old_ylim = plt.ylim()
@@ -644,27 +654,18 @@ def main():
             print("old_top:", new_top)
             print("old_low:", new_low)
 
-            amax = np.amax(metrics_array[a])
-            bmax = np.amax(metrics_array[b])
-            amin = np.amin(metrics_array[a])
-            bmin = np.amin(metrics_array[b])
-
             if (new_low <= -10):
-                if amin <= bmin and amin>= -10:
-                    new_low = 1.5*amin
-                elif bmin <= amin and bmin >= -10:
-                    new_low = 1.5*bmin
-                else:
-                    new_low = -10
+                new_low = -10
 
             if (new_top >= 10):
-                if amax >= bmax and amax<= 10:
-                    new_top = 1.5*amax
-                elif bmin <= amin and amin <= 10:
-                    new_top = 1.5*bmax
-                else:
-                    new_top = 10
+                new_top = 10
 
+            if j == 0 or j == 4:
+                new_top = 2
+                new_low = -8
+                plt.yticks(np.arange(-8, 3, step=1))
+            if j == 1 or j == 2 or j == 3:
+                new_low = -0.5
             print("new_top:", new_top)
             print("new_low:", new_low)
 
