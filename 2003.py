@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.metrics import explained_variance_score, max_error, mean_absolute_error, mean_squared_error, median_absolute_error, r2_score
-from SolarWindImport import import_omni_year, import_omni_month, import_storm_week, storm_interpolator
+from SolarWindImport import import_omni_year, import_omni_month, import_storm_week, storm_interpolator, storm_chunker
 
 
 def main():
@@ -500,70 +500,23 @@ def main():
         y_pred_array.append(pred_y)
 
     # ---------------------------------------------------------------
-    # CHUNKING INTO ONE HOUR
+    # CHUNKING STORMS
 
-    def storm_chunker(y_true, y_pred, y_pers, resolution='1h'):
-        """
-        Splits the storm into chunks of timesteps (only 1 hour implemented)
-        If there's any gaps due to removed NaNs, it just means that hour will 
-        have slightly less datapoints in it. E.g. the borders of the chunk will
-        still be 60 minutes apart, if not 60 datapoints apart.
-
-        Args:
-          y_true: the AL of true (discretized) AL to compare against
-          y_pred: the predicted values of AL from the model
-          y_pers: the persistence/AL history values
-
-        Returns:
-          chunks: array of 3-col dfs, each col is true, pred, pers
-        """
-
-        first_dt = y_true.index[0]  # start_dt cannot precede this 
-        limit_dt = y_true.index[-1]  # end_dt cannot exceed this
-
-        year = int(first_dt.strftime("%Y"))
-        month = int(first_dt.strftime("%m"))
-        day = int(first_dt.strftime("%d"))
-        hour = int(first_dt.strftime("%H"))
-
-        # set it to the first (hopefully) full hour
-        if (resolution=='1h'):
-            start_dt = datetime.datetime(year, month, day, int(hour)+1, 0)
-            end_dt = start_dt + datetime.timedelta(minutes=59)
-
-        chunks = []
-        while (end_dt <= limit_dt):
-
-            # get the chunk
-            true_chunk = y_true.loc[start_dt:end_dt]
-            pers_chunk = y_pers.loc[start_dt:end_dt]
-            pred_chunk = y_pred.loc[start_dt:end_dt]
-
-            chunk_index = true_chunk.index
-
-            # make one df for all three, append
-            chunks.append(pd.concat(
-                [true_chunk, pred_chunk, pers_chunk], axis=1, sort=False))
-
-            # by iterating hours=1, we keep the XX:00 -> XX:59 spacing intact
-            start_dt += datetime.timedelta(hours=1)
-            end_dt += datetime.timedelta(hours=1)
-
-
-        # now that every chunk for this storm is generated, return
-        return chunks
+    chunk_res = '6h'
 
     # will store the array of chunks for each of the storms
     chunks_array = []
+
     print("\nChunking storms:")
-    for i in range(0,len(storm_array)):
+    for i in range(0, len(storm_array)):
         print(storm_str_array[i])
 
         # call the storm_chunker function to get array of chunks
         chunks_array.append(
-            storm_chunker(y_array[i], y_pred_array[i], X_array[i]['AL_hist']))
+            storm_chunker(y_array[i], y_pred_array[i], X_array[i]['AL_hist'],
+                          resolution=chunk_res))
 
-    print("\nValidation storms have been chunked.")
+    print("Validation storms have been chunked.")
 
     # ---------------------------------------------------------------
     # CALCULATING THE METRICS FOR EACH CHUNK
@@ -576,7 +529,7 @@ def main():
         # index array to plot metric against
         index_array = []
 
-        # for each 1 hour chunk
+        # for each chunk
         for chunk in storm:
 
             # run the metrics
@@ -584,7 +537,6 @@ def main():
 
                 temp_metrics = storm_metrics(
                     chunk['AL'], chunk['pred_AL'], chunk['AL_hist'])
-                # print(temp_metrics)
 
                 # append it into our array
                 for j in range(0, len(temp_metrics)):
@@ -594,16 +546,20 @@ def main():
                 index_array.append(chunk['AL'].index[0].to_numpy())
 
         # OKAY lets get plotting for each metric!
-
         for j in range(0, 5):
+
+            # this deals with model->pers->model->pers layout of metrics array
             a = 2*j
             b = a+1
 
             plt.figure()
-            plt.title(metrics[j] + " " + storm_str_array[i])
+            plt.title(metrics[j] + " - " + chunk_res + " - "
+                      + storm_str_array[i])
 
-            plt.plot(index_array, metrics_array[a], label='Model')
-            plt.plot(index_array, metrics_array[b], label='Persistence')
+            plt.plot(index_array, metrics_array[a], label='Model',
+                     marker='.')
+            plt.plot(index_array, metrics_array[b], label='Persistence',
+                     marker='.')
             plt.axvline(storm_start_array[i], c='k', ls='--',
                         label='Storm period')
             plt.axvline(storm_end_array[i], c='k', ls='--')
@@ -611,14 +567,10 @@ def main():
             plt.ylabel('Metric score: ' + metrics_desc[j])
             plt.xlabel('DateTime')
 
+            # get the ylim so we can check if the default is okay
             old_ylim = plt.ylim()
             new_low = old_ylim[0]
             new_top = old_ylim[1]
-            
-            
-            print("\n")
-            print("old_top:", new_top)
-            print("old_low:", new_low)
 
             if (new_low <= -10):
                 new_low = -10
@@ -626,17 +578,18 @@ def main():
             if (new_top >= 10):
                 new_top = 10
 
+            # if a best 1.0 metric, no need to go above 2
             if j == 0 or j == 4:
                 new_top = 2
                 new_low = -8
                 plt.yticks(np.arange(-8, 3, step=1))
+
+            # if a best 0.0 metric, no need to go below -0.5
             if j == 1 or j == 2 or j == 3:
                 new_low = -0.5
-            print("new_top:", new_top)
-            print("new_low:", new_low)
 
+            # set the ylim again
             plt.ylim((new_low, new_top))
-            print(j, plt.ylim())
             plt.legend(loc='best')
 
 
