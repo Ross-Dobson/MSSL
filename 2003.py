@@ -301,63 +301,29 @@ def main():
         Returns:
           None
         """
-        # print("\nSTORM METRICS:")
-        
-        # print("\nExplained variance score (higher is better, best 1.0):")
-        # print("Discretized AL:",
-              # explained_variance_score(y_true, y_pred))
-        # print("Persistence AL:",
-              # explained_variance_score(y_true, y_pers))
+
+        # Explained variance score (higher is better, best 1.0)
         evs_true = explained_variance_score(y_true, y_pred)
         evs_pers = explained_variance_score(y_true, y_pers)
 
-        if(evs_true > 1):
-            print("evs_true")
-        if(evs_pers >1):
-            print("evs_pers")
-
-        # print("\nMean absolute error (lower is better, best 0.0):")
-        # print("Discretized AL:", mean_absolute_error(y_true, y_pred))
-        # print("Persistence AL:", mean_absolute_error(y_true, y_pers))
+        # Mean absolute error (lower is better, best 0.0)
         mean_true = mean_absolute_error(y_true, y_pred)
         mean_pers = mean_absolute_error(y_true, y_pers)
-        
-        # print("\nMean squared error (lower is better, best 0.0):")
-        # print("Discretized AL:", mean_squared_error(y_true, y_pred))
-        # print("Persistence AL:", mean_squared_error(y_true, y_pers))
+
+        # Mean squared error (lower is better, best 0.0)
         mse_true = mean_squared_error(y_true, y_pred)
         mse_pers = mean_squared_error(y_true, y_pers)
-        
-        # this penalizes underpreciction more than overprediction
-        # Mean squared logarithmic error (lower is better, best 0.0)
-        # Penalizes underpreciction better. Good for exponential growth.
-        # Unsure of usefulness here."
-        # print("Discretized AL:", mean_squared_log_error(
-        #     y_true, y_pred))
-        # print("Persistence AL:", mean_squared_log_error(
-        #     y_true, y_pers))
 
         # not too affected by outliers - good choice of metric?
-        # print("\nMedian absolute error (lower is better, best 0.0):")
-        # print("Discretized AL:", median_absolute_error(
-            # y_true, y_pred))
-        # print("Persistence AL:", median_absolute_error(
-            # y_true, y_pers))
+        # Median absolute error (lower is better, best 0.0)
         medi_true = median_absolute_error(y_true, y_pred)
         medi_pers = median_absolute_error(y_true, y_pers)
 
         # variance is dependent on dataset, might be a pitfall
-        # print("\nR2 coefficient of determination (higher=better), best 1)")
-        # print("Discretized AL:", r2_score(y_true, y_pred))
-        # print("Persistence AL:", r2_score(y_true, y_pers))
+        # R2 coefficient of determination (higher=better), best 1.0
         r2_true = r2_score(y_true, y_pred)
         r2_pers = r2_score(y_true, y_pers)
 
-        if (r2_true > 1):
-            print("r2_true")
-        if (r2_pers > 1):
-            print("r2_pers")
-        
         return evs_true, evs_pers, mean_true, mean_pers, mse_true, mse_pers, medi_true, medi_pers, r2_true, r2_pers
 
     metrics = ["Explained variance score",
