@@ -269,6 +269,66 @@ def storm_interpolator(my_df):
     return df_resampled
 
 
+def storm_chunker(y_true, y_pred, y_pers, resolution='1h'):
+    """
+    Splits the storm into chunks of timesteps (1h and 6h implemented)
+    If there's any gaps due to removed NaNs, it just means that hour will
+    have slightly less datapoints in it. E.g. the borders of the chunk will
+    still be 60 minutes apart, if not 60 datapoints apart.
+
+    Args:
+      y_true: the AL of true (discretized) AL to compare against
+      y_pred: the predicted values of AL from the model
+      y_pers: the persistence/AL history values
+
+    Returns:
+      chunks: array of 3-col dfs, each col is true, pred, pers
+
+    Author:
+      Ross Dobson 2020-10-06
+    """
+
+    first_dt = y_true.index[0]  # start_dt cannot precede this 
+    limit_dt = y_true.index[-1]  # end_dt cannot exceed this
+
+    year = int(first_dt.strftime("%Y"))
+    month = int(first_dt.strftime("%m"))
+    day = int(first_dt.strftime("%d"))
+    hour = int(first_dt.strftime("%H"))
+
+    # set it to the first (hopefully) full hour
+    if (resolution == '1h'):
+        start_dt = datetime.datetime(year, month, day, int(hour)+1, 0)
+        end_dt = start_dt + datetime.timedelta(minutes=59)
+
+    elif (resolution == '6h'):
+        start_dt = datetime.datetime(year, month, day, int(hour)+1, 0)
+        end_dt = start_dt + datetime.timedelta(hours=5, minutes=59)
+
+    else:
+        raise ValueError('This resolution', resolution, 'is not implemented.')
+
+    chunks = []
+    while (end_dt <= limit_dt):
+
+        # get the chunk
+        true_chunk = y_true.loc[start_dt:end_dt]
+        pers_chunk = y_pers.loc[start_dt:end_dt]
+        pred_chunk = y_pred.loc[start_dt:end_dt]
+
+        # make one df for all three, append
+        chunks.append(pd.concat(
+            [true_chunk, pred_chunk, pers_chunk], axis=1, sort=False))
+
+        # by iterating hours=1, we keep the XX:00 -> XX:59 spacing intact
+        start_dt += datetime.timedelta(hours=1)
+        end_dt += datetime.timedelta(hours=1)
+
+    # now that every chunk for this storm is generated, return
+    return chunks
+
+
+
 def main():
     print("Don't execute this file. Import it and use its functions.")
 
