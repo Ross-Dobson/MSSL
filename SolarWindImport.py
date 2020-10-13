@@ -298,12 +298,14 @@ def storm_chunker(y_true, y_pred, y_pers, resolution='1h'):
 
     # set it to the first (hopefully) full hour
     if (resolution == '1h'):
-        start_dt = datetime.datetime(year, month, day, int(hour)+1, 0)
+        start_dt = datetime.datetime(year, month, day, hour, 0)
         end_dt = start_dt + datetime.timedelta(minutes=59)
+        interval = 1
 
     elif (resolution == '6h'):
-        start_dt = datetime.datetime(year, month, day, int(hour)+1, 0)
+        start_dt = datetime.datetime(year, month, day, hour, 0)
         end_dt = start_dt + datetime.timedelta(hours=5, minutes=59)
+        interval = 6
 
     else:
         raise ValueError('This resolution', resolution, 'is not implemented.')
@@ -321,8 +323,8 @@ def storm_chunker(y_true, y_pred, y_pers, resolution='1h'):
             [true_chunk, pred_chunk, pers_chunk], axis=1, sort=False))
 
         # by iterating hours=1, we keep the XX:00 -> XX:59 spacing intact
-        start_dt += datetime.timedelta(hours=1)
-        end_dt += datetime.timedelta(hours=1)
+        start_dt += datetime.timedelta(hours=interval)
+        end_dt += datetime.timedelta(hours=interval)
 
     # now that every chunk for this storm is generated, return
     return chunks
