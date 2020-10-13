@@ -20,8 +20,7 @@ def main():
 
     # The method import_omni_year checks for Pickles itself
     # so we do not need to enclose this in a try statement
-    year = 2003
-    data_2003 = import_omni_year(year)
+    data_2003 = import_omni_year(2003)
 
     # ---------------------------------------------------------------
     # IMPORTING OCTOBER AND NOVEMBER SEPERATELY TO ZOOM IN
@@ -53,22 +52,22 @@ def main():
     # The features we care about
     model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
 
-    # get just that data
+    # get just that data in a new dataframe
     df_2003 = data_2003[model_vals].copy()
 
-    # get the AL values separately
-    df_AL = data_2003['AL'].copy()
+    # get the AL values separately, again in a new df/series
+    raw_AL = data_2003['AL'].copy()
 
     # ---------------------------------------------------------------
     # PERSISTENCE TIME HISTORY OF AL
 
     # Roll right, 30 minutes.
     # E.g. 12:00-12:30 -> 12:30, 12:01-12:31 -> 12:31
-    disc_AL = df_AL.rolling(30).min()
+    pers_AL = raw_AL.copy()
+    pers_AL = pers_AL.rolling(30).min()
 
     # create a copy before shifting - this is for persistence model later
-    pers_AL = disc_AL.copy()
-    pers_AL_index = pers_AL.index
+    disc_AL = pers_AL.copy()
 
     # now, for our y/target data, we do a roll left by shifting
     # e.g. 12:00 <- 12:00-12:30, 12:01 <- 12:01-12:31
@@ -83,6 +82,7 @@ def main():
     # now, drop the last 30 minutes of all the other data so shapes stay equal
     df_2003.drop(df_2003.tail(30).index, inplace=True)
     pers_AL.drop(pers_AL.tail(30).index, inplace=True)
+    raw_AL.drop(raw_AL.tail(30).index, inplace=True)
 
     # for the persistence model, we do the same, but they'll drop from head
     pers_AL.dropna(axis='index', how='any', inplace=True)
@@ -90,25 +90,26 @@ def main():
     # drop the beginning 29 minutes of all other data to match (why 29? idk)
     df_2003.drop(df_2003.head(29).index, inplace=True)
     disc_AL.drop(disc_AL.head(29).index, inplace=True)
+    raw_AL.drop(raw_AL.head(29).index, inplace=True)
 
     # ---------------------------------------------------------------
-    # ADD PERSISTENCE AS A FEATURE
-    df_2003.insert(6, "AL_hist", pers_AL)
+    # ADD PERSISTENCE AS A FEATURE TO THE X ARRAY
+    df_2003.insert(6, "AL_hist", pers_AL.copy())
     model_vals.append("AL_hist")
 
     # take cols and index for remaking DF after scaling
     df_index = df_2003.index
 
     # ---------------------------------------------------------------
-    # CORRELATION MATRIX BEFORE SCALER
+    # # CORRELATION MATRIX BEFORE SCALER
 
     # # add disc AL
     # df_2003.insert(7, "disc_AL", disc_AL)
 
-    # # # This is obsolete, but commented here as reminder of current state of
-    # # # the dataframes
-    # # # corr_pars = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V',
-    # #              # 'AL_hist', 'disc_AL']
+    # # This is obsolete, but commented here as reminder of current state of
+    # # the dataframes
+    # # corr_pars = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V',
+    #              # 'AL_hist', 'disc_AL']
 
     # print("\nCorrelation matrix before standardization:\n")
     # print(df_2003.corr())
@@ -132,22 +133,33 @@ def main():
     df_2003 = pd.DataFrame(X_scaled, columns=model_vals, index=df_index)
     print("\n2003 features have been scaled.")
 
-    # scale AL
+    # scale AL. We need to scale the discrete AL, and the raw AL
     y_scaler = StandardScaler()
-    arr_AL = disc_AL.to_numpy()
-    arr_AL = arr_AL.reshape(-1, 1)
-    y_scaler = y_scaler.fit(arr_AL)
-    y_scaled = y_scaler.transform(arr_AL)
+    raw_scaler = StandardScaler()
+
+    # reshape because StandardScaler needs (n_samples, n_features)
+    disc_AL = disc_AL.to_numpy().reshape(-1, 1)
+    raw_AL = raw_AL.to_numpy().reshape(-1, 1)
+
+    # fit the scaler to the data
+    y_scaler = y_scaler.fit(disc_AL)
+    raw_scaler = raw_scaler.fit(raw_AL)
+
+    # get our newly scaled y values
+    y_scaled = y_scaler.transform(disc_AL)
+    raw_scaled = raw_scaler.transform(raw_AL)
 
     # need to add it back into a DF
-    disc_AL = pd.DataFrame(y_scaled, columns=['AL'], index=df_index)
+    disc_AL = pd.DataFrame(y_scaled, columns=['disc_AL'], index=df_index)
+    raw_AL = pd.DataFrame(raw_scaled, columns=['raw_AL'], index=df_index)
+
     print("2003 AL has been scaled.")
 
     # ---------------------------------------------------------------
     # # CORR AFTER STANDARDISATION
 
     # # Add AL back in to the df
-    # df_2003.insert(7, "disc_AL", y_scaled)
+    # df_2003.insert(7, "disc_AL", disc_AL)
 
     # print("\nCorrelation matrix after standardization:\n")
     # print(df_2003.corr())
@@ -184,8 +196,7 @@ def main():
     # print(mutual_info_regression(
     #     mi_2003['P'].to_numpy().reshape(-1, 1), mi_2003['n_p']))
 
-    # print("")
-    # print(model_vals, "vs AL:")
+    # print("Discrete AL vs", model_vals, ":")
     # print(mutual_info_regression(mi_2003, mi_AL))
 
     # for i, feature in enumerate(model_vals):
@@ -200,8 +211,9 @@ def main():
     #     print(feature_array)
     #     print(mutual_info_regression(big_df, small_df))
 
+
     # ---------------------------------------------------------------
-    # REMOVING USELESS PARAMETERS
+    # REMOVING UNNEEDED PARAMETERS
 
     # removing n_p - in the words of Mayur
     # "by far weakest correlation with AL and a strong correlation with P"
@@ -209,9 +221,21 @@ def main():
 
     # ---------------------------------------------------------------
     # INTERPOLATING GAPS
+
+    # to make the indexes match, we're gonna combine the whole damn thing
+    # and chuck it all through interpolator: df_2003 + disc_AL + raw_AL
+    df_2003.insert(5, "disc_AL", disc_AL)
+    df_2003.insert(6, "raw_AL", raw_AL)
+
+    # run the interpolation
     df_2003 = storm_interpolator(df_2003)
 
     print("\n2003 features interpolated.")
+
+    # seperate these two back off, drop them
+    raw_AL = df_2003['raw_AL'].copy()
+    disc_AL = df_2003['disc_AL'].copy()
+    df_2003 = df_2003.drop(["raw_AL", "disc_AL"], axis=1)
 
     # ---------------------------------------------------------------
     # PLOT HISTOGRAMS:
@@ -234,13 +258,15 @@ def main():
 
     print("\nFolding the data (cross-validation):")
     tscv = TimeSeriesSplit()
-    fold_counter = 1
+    fold_counter = 0
+
     for train_index, test_index in tscv.split(df_2003):
-        # print("TRAIN:", train_index, "TEST:", test_index)  # debug
+
+        fold_counter += 1
         print("Fold", fold_counter, "...")
+        # print("TRAIN:", train_index, "TEST:", test_index)  # debug
         X_train, X_test = df_2003.iloc[train_index], df_2003.iloc[test_index]
         y_train, y_test = disc_AL.iloc[train_index], disc_AL.iloc[test_index]
-        fold_counter += 1
 
     print("Folding complete.")
 
@@ -257,35 +283,18 @@ def main():
     # LINEAR REGRESSION PREDICTION AND SCORES
     y_pred = regr.predict(X_test)
 
-    print("\nLinear Regression score (R^2 coeff, best 1.0):")
-    print("Score:", regr.score(X_test, y_test))
+    print("\nLinear Regression R^2 score (best 1.0)",
+          regr.score(X_test, y_test))
+    # print(r2_score(y_test, y_pred))
 
-    # put y pred back in a dataframe, just makes life easier for future
+    # put y pred in a dataframe, just makes life easier for future
     y_test_index = y_test.index
     y_pred = pd.DataFrame(y_pred, columns=['pred_AL'], index=y_test_index)
 
     # ---------------------------------------------------------------
-    # MAKING PERSISTENCE MATCH
+    # GET PERSISTENCE AGAIN
 
-    # earliest datetime that != NaN (because of rolling left by default)
-    earliest_dt = pers_AL.index[0]
-
-    # similarly, latest that != Nan (because this is rolled right, shifted -30)
-    latest_dt = disc_AL.index[-1]
-
-    # so now we can make an index of these happy values to use
-    happy_index = y_test_index[(y_test_index >= earliest_dt)
-                               & (y_test_index <= latest_dt)]
-
-    # If running metrics on 2003 data, this would be what you used
-    # Leaving here as reference so easier to generate for other storms
-    # test_df = pd.DataFrame(
-    #     y_test.loc[happy_index], columns=['AL'], index=happy_index)
-
-    # pred_df = y_pred.loc[happy_index]
-
-    pers_df = pd.DataFrame(pers_AL, columns=['AL'], index=pers_AL_index)
-    pers_df = pers_df.loc[happy_index]
+    pers_AL = df_2003['AL_hist'].copy()
 
     # ---------------------------------------------------------------
     # EVALUATING OUR MODEL VS PERSISTENCE MODEL
@@ -336,9 +345,10 @@ def main():
                     "lower is better, best 0.0",
                     "lower is better, best 0.0",
                     "lower is better, best 0.0",
-                    "best value is 1"]
+                    "higher is better, best 1.0"]
+
     # 2003 data - don't actually want to run metrics on this though
-    # storm_metrics(test_df, pred_df, pers_df)
+    # storm_metrics(y_test, pred_df, pers_AL)
 
     # ***************************************************************
     # ***************************************************************
@@ -362,11 +372,11 @@ def main():
 
     storm_array = [storm_2, storm_3, storm_4, storm_5, storm_6]
 
-    storm_str_array = ["2006-12-14 to 2006-12-16",
-                       "2001-08-31 to 2001-09-01",
-                       "2005-08-31 to 2005-09-01",
-                       "2010-04-05 to 2010-04-06",
-                       "2011-08-05 to 2011-08-06"]
+    storm_str_array = ["2006-12-14 12:00 to 2006-12-16 00:00",
+                       "2001-08-31 00:00 to 2001-09-01 00:00",
+                       "2005-08-31 10:00 to 2005-09-01 12:00",
+                       "2010-04-05 00:00 to 2010-04-06 00:00",
+                       "2011-08-05 09:00 to 2011-08-06 00:00"]
 
     storm_start_array = [datetime.datetime(2006, 12, 14, 12, 0, 0),
                          datetime.datetime(2001, 8, 31, 0, 0, 0),
@@ -388,15 +398,15 @@ def main():
     model_vals = ['B_X_GSM', 'B_Y_GSM', 'B_Z_GSM', 'n_p', 'P', 'V']
 
     X_array = []
-    y_array = []
+    raw_array = []
     for i, storm in enumerate(storm_array):
         storm_index = storm.index  # save this for reconstructing DF later
         X = storm[model_vals].copy()
-        y = storm['AL'].copy()
+        raw = storm['AL'].copy()
 
         # each storm's features to a df, append to X_array of dataframes
         X_array.append(pd.DataFrame(X, columns=model_vals, index=storm_index))
-        y_array.append(pd.DataFrame(y, columns=['AL'], index=storm_index))
+        raw_array.append(pd.DataFrame(raw, columns=['AL'], index=storm_index))
 
     # ---------------------------------------------------------------
     # PERSISTENCE AND DISCRETIZATION (is that even a word)
@@ -404,64 +414,85 @@ def main():
     disc_array = []
     pers_array = []
     df_index_array = []
-    # i.e. for each AL dataframe
-    for i, y in enumerate(y_array):
-        disc_y = y.rolling(30).min()  # roll right, 30 minute window
-        pers_y = disc_y.copy()
+
+    # i.e. for each storm's raw AL dataframe
+    for i, raw in enumerate(raw_array):
+        pers_y = raw.copy()
+        pers_y = pers_y.rolling(30).min()  # roll right, 30 minute window
+        disc_y = pers_y.copy()
         disc_y = disc_y.shift(-30)  # roll left for discrete AL
 
         # drop the 30 minutes of NaNs from the shifting
         disc_y.dropna(axis='index', how='any', inplace=True)
+
+        # drop last 30 minutes of all others to match disc
+        pers_y.drop(pers_y.tail(30).index, inplace=True)
+        raw.drop(raw.tail(30).index, inplace=True)
+
+        # for persistence, the NaNs will dorp from head
         pers_y.dropna(axis='index', how='any', inplace=True)
 
-        # make the two match up
-        pers_y.drop(pers_y.tail(30).index, inplace=True)
+        # drop first 29 minutes to match
         disc_y.drop(disc_y.head(29).index, inplace=True)
+        raw.drop(raw.head(29).index, inplace=True)
 
-        # add to the master arrays
+        # add to the arrays outside the loop
         pers_array.append(pers_y)
         disc_array.append(disc_y)
+        raw_array[i] = raw.copy()
 
-        # the indexes to remake the DF after scaling
+        # store the indexes for later (same for disc, pers, raw)
         df_index_array.append(disc_y.index)
 
+    # go through the five X feature arrays
     for i, X in enumerate(X_array):
+
+        # make them match AL
         X.drop(X.tail(30).index, inplace=True)
         X.drop(X.head(29).index, inplace=True)
 
-        # ADD PERSISTENCE AS A FEATURE
+        # ADD THEIR PERSISTENCE AS A FEATURE
         X.insert(6, "AL_hist", pers_array[i].to_numpy())
-        X_array[i] = X
+        X_array[i] = X.copy()
 
     # outside the for loop so we dont add it more than once!
     model_vals.append("AL_hist")
 
     # ---------------------------------------------------------------
     # STANDARD SCALING
-    # we use the same scalers we used earlier. X_scaler and y_scaler
+    # we use the same scalers we used earlier. X_scaler, y_scaler, raw_scaler
+    # recall X_array, raw_array. disc_array already defined, so we overwrite
 
-    y_array = []  # this is really, really bad practice...
     for i, storm_index in enumerate(df_index_array):
 
         # scale the main features
-        X_trans = X_scaler.transform(X_array[i])
+        X_scaled = X_scaler.transform(X_array[i])
 
         # each storm's features to a df, append to X_array of dataframes
-        X_array[i] = pd.DataFrame(X_trans,
+        X_array[i] = pd.DataFrame(X_scaled,
                                   columns=model_vals, index=storm_index)
 
-        # scale AL
-        y = disc_array[i].to_numpy()
-        y = y.reshape(-1, 1)
-        y_trans = y_scaler.transform(y)
+        # scale disc AL
+        disc = disc_array[i].to_numpy()
+        disc = disc.reshape(-1, 1)
+        disc_scaled = y_scaler.transform(disc)
 
-        # each storm's AL to a df, append to y_array of dataframes
-        y_array.append(pd.DataFrame(
-            y_trans, columns=['AL'], index=storm_index))
+        # scale raw AL
+        raw = raw_array[i].to_numpy()
+        raw = raw.reshape(-1, 1)
+        raw_scaled = raw_scaler.transform(raw)
+
+        # store in the main arrays outside the loop
+        disc_array[i] = pd.DataFrame(disc_scaled, columns=['disc_AL'],
+                                     index=storm_index)
+        raw_array[i] = pd.DataFrame(raw_scaled, columns=['raw_AL'],
+                                    index=storm_index)
+
+    print("\nValidation storm features and AL have been scaled.")
 
     # ---------------------------------------------------------------
     # REMOVING N_P
-    # "by far weakest correlation with AL and a strong correlation with P"
+    # "by far weakest correlation with AL, and a strong correlation with P"
 
     for i, X in enumerate(X_array):
         X = X.drop(["n_p"], axis=1)
@@ -472,19 +503,25 @@ def main():
     # remember, no longer need to interpolate y because its discretized
 
     # each storm will drop seperate dt, so store index to remake df
-    week_index_array = []
+    interped_index_array = []
 
     for i, X in enumerate(X_array):
+
+        # to make the indexes match, we're gonna combine everything
+        # and chuck it all through the interpolator: df_200 + disc_AL + raw_AL
+        X.insert(5, "disc_AL", disc_array[i])
+        X.insert(6, "raw_AL", raw_array[i])
 
         # interpolate the storm
         X_array[i] = storm_interpolator(X)
 
-        # store the new index for this storm, for later
-        week_index_array.append(X_array[i].index)
+        # seperate these two back off, drop them
+        raw_array[i] = X_array[i]['raw_AL'].copy()
+        disc_array[i] = X_array[i]['disc_AL'].copy()
+        X_array[i] = X_array[i].drop(['raw_AL', 'disc_AL'], axis=1)
 
-    # make sure y matches the X index (ie match the dropped points)
-    for i, index in enumerate(week_index_array):
-        y_array[i] = y_array[i].loc[index]
+        # store the new index for this storm, for later
+        interped_index_array.append(X_array[i].index)
 
     print("\nTest storms interpolated.")
 
@@ -496,25 +533,25 @@ def main():
     for i, X in enumerate(X_array):
         prediction = regr.predict(X)
         pred_y = pd.DataFrame(
-            prediction, columns=["pred_AL"], index=week_index_array[i])
+            prediction, columns=["pred_AL"], index=interped_index_array[i])
         y_pred_array.append(pred_y)
 
     # ---------------------------------------------------------------
     # CHUNKING STORMS
-
     chunk_res = '6h'
 
     # will store the array of chunks for each of the storms
     chunks_array = []
 
     print("\nChunking storms:")
+
     for i in range(0, len(storm_array)):
-        print(storm_str_array[i])
+        print("Chunking the week around storm", storm_str_array[i])
 
         # call the storm_chunker function to get array of chunks
         chunks_array.append(
-            storm_chunker(y_array[i], y_pred_array[i], X_array[i]['AL_hist'],
-                          resolution=chunk_res))
+            storm_chunker(disc_array[i], y_pred_array[i],
+                          X_array[i]['AL_hist'], resolution=chunk_res))
 
     print("Validation storms have been chunked.")
 
@@ -526,7 +563,7 @@ def main():
 
         metrics_array = [[], [], [], [], [], [], [], [], [], []]
 
-        # index array to plot metric against
+        # index array to plot the metric against
         index_array = []
 
         # for each chunk
@@ -534,16 +571,18 @@ def main():
 
             # run the metrics
             if (len(chunk) != 0):
-
                 temp_metrics = storm_metrics(
-                    chunk['AL'], chunk['pred_AL'], chunk['AL_hist'])
+                    chunk['disc_AL'], chunk['pred_AL'], chunk['AL_hist'])
 
-                # append it into our array
+                # append it into our metrics array
                 for j in range(0, len(temp_metrics)):
                     metrics_array[j].append(temp_metrics[j])
 
-                # also, get the index
-                index_array.append(chunk['AL'].index[0].to_numpy())
+                # get just index[0] as we're appending to a whole array
+                index_array.append(chunk['disc_AL'].index[0].to_numpy())
+
+            else:
+                raise Exception("It's all gone a bit J.G. Ballard out there.")
 
         # OKAY lets get plotting for each metric!
         for j in range(0, 5):
@@ -552,23 +591,23 @@ def main():
             a = 2*j
             b = a+1
 
-            plt.figure()
-            plt.title(metrics[j] + " - " + chunk_res + " - "
-                      + storm_str_array[i])
+            fig, axs = plt.subplots(2, sharex=False)
+            fig.suptitle(metrics[j] + " - " + chunk_res + " - "
+                         + storm_str_array[i])
 
-            plt.plot(index_array, metrics_array[a], label='Model',
-                     marker='.')
-            plt.plot(index_array, metrics_array[b], label='Persistence',
-                     marker='.')
-            plt.axvline(storm_start_array[i], c='k', ls='--',
-                        label='Storm period')
-            plt.axvline(storm_end_array[i], c='k', ls='--')
-            plt.axhline(0, c='k', alpha=0.5, ls='dotted')
-            plt.ylabel('Metric score: ' + metrics_desc[j])
-            plt.xlabel('DateTime')
+            axs[0].plot(index_array, metrics_array[a], label='Model',
+                        marker='.')
+            axs[0].plot(index_array, metrics_array[b], label='Persistence',
+                        marker='.')
+            axs[0].axvline(storm_start_array[i], c='k', ls='--',
+                           label='Storm period')
+            axs[0].axvline(storm_end_array[i], c='k', ls='--')
+            axs[0].axhline(0, c='k', alpha=0.5, ls='dotted')
+            axs[0].set_ylabel('Metric score: ' + metrics_desc[j])
+            axs[0].set_xlabel('DateTime')
 
             # get the ylim so we can check if the default is okay
-            old_ylim = plt.ylim()
+            old_ylim = axs[0].get_ylim()
             new_low = old_ylim[0]
             new_top = old_ylim[1]
 
@@ -582,15 +621,30 @@ def main():
             if j == 0 or j == 4:
                 new_top = 2
                 new_low = -8
-                plt.yticks(np.arange(-8, 3, step=1))
+                axs[0].set_yticks(np.arange(-8, 3, step=1))
 
             # if a best 0.0 metric, no need to go below -0.5
             if j == 1 or j == 2 or j == 3:
                 new_low = -0.5
 
             # set the ylim again
-            plt.ylim((new_low, new_top))
-            plt.legend(loc='best')
+            axs[0].set_ylim((new_low, new_top))
+
+            # generate the legend, auto-location
+            axs[0].legend(loc='best')
+
+            # the subplot - disc AL vs raw AL vs persistence AL
+            start = index_array[0]
+            end = index_array[-1]
+
+            axs[1].plot(disc_array[i].loc[start:end], label='disc', alpha=0.5)
+            axs[1].plot(raw_array[i].loc[start:end], label='raw', alpha=0.5)
+
+            axs[1].axvline(storm_start_array[i], c='k', ls='--',
+                           label='Storm period')
+            axs[1].axvline(storm_end_array[i], c='k', ls='--')
+
+            axs[1].legend(loc='best')
 
 
 main()
