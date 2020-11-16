@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt  # remember to run 'matplotlib tk'
 import matplotlib.dates as dt
 import pathlib  # used for compatibility with non-POSIX systems
 import datetime
+import seaborn as sns
 
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
@@ -166,6 +167,16 @@ def main():
 
     # drop AL again, don't want it as a feature anymore
     df_2003 = df_2003.drop(["disc_AL"], axis=1)
+
+    # ---------------------------------------------------------------
+    # VIOLIN PLOTS
+    # to check the distributions
+    fig, ax = plt.subplots()
+    ax = sns.violinplot(data = df_2003)
+    _ = ax.set_xticklabels(df_2003.keys(), rotation=90)
+    ax.set_title('Violin plot of df_2003')
+    ax.set_xlabel('Feature')
+    ax.set_ylabel('Normalized')
 
     # ---------------------------------------------------------------
     # # MUTUAL INFORMATION
