@@ -172,7 +172,7 @@ def main():
     # VIOLIN PLOTS
     # to check the distributions
     fig, ax = plt.subplots()
-    ax = sns.violinplot(data = df_2003)
+    ax = sns.violinplot(data=df_2003)
     _ = ax.set_xticklabels(df_2003.keys(), rotation=90)
     ax.set_title('Violin plot of df_2003')
     ax.set_xlabel('Feature')
@@ -257,6 +257,16 @@ def main():
     #     plt.figure()
     #     plt.hist(df_2003[param], bins=35)
     #     plt.title('Histogram of '+param+' after StandardScaler')
+
+    # ---------------------------------------------------------------
+    # KERAS PREP STEP:
+    pkl_dir = pathlib.Path('/content/drive/My Drive/MSSL_DATA/pkl')
+
+    pkl_path = pkl_dir / ('2003_' + 'X' + '.pkl')
+    df_2003.to_pickle(pkl_path)
+
+    pkl_path = pkl_dir / ('2003_' + 'y' + '.pkl')
+    disc_AL.to_pickle(pkl_path)
 
     # ---------------------------------------------------------------
     # TRAIN TEST SPLIT
