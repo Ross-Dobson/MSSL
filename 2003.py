@@ -260,7 +260,7 @@ def main():
 
     # ---------------------------------------------------------------
     # KERAS PREP STEP:
-    pkl_dir = pathlib.Path('~/Documents/Python/Projects/MSSL/Data/OMNI/pickles')
+    pkl_dir = pathlib.Path('Data/OMNI/pickles')
 
     pkl_path = pkl_dir / ('2003_' + 'X' + '.pkl')
     df_2003.to_pickle(pkl_path)
@@ -449,10 +449,10 @@ def main():
 
     # for pickling any storms later
     storm_fname_array = ["2006-12-14",
-                        "2001-08-31",
-                        "2005-08-31",
-                        "2010-04-05",
-                        "2011-08-05"]
+                         "2001-08-31",
+                         "2005-08-31",
+                         "2010-04-05",
+                         "2011-08-05"]
 
     storm_start_array = [datetime.datetime(2006, 12, 14, 12, 0, 0),
                          datetime.datetime(2001, 8, 31, 0, 0, 0),
@@ -601,6 +601,23 @@ def main():
 
     print("\nTest storms interpolated.")
 
+    # ---------------------------------------------------------------
+    # KERAS PREPATORY STEP:
+    # copy out storms 0 and 2 to use as testing data. We don't want all 5!
+    keras_X = [X_array[0], X_array[2]]
+    keras_raw = [raw_array[0], raw_array[2]]
+    keras_disc = [disc_array[0], raw_array[2]]
+    
+    pkl_path = pkl_dir / (storm_fname_array[0] + 'X' + '.pkl')
+    keras_X[0].to_pickle(pkl_path)
+    pkl_path = pkl_dir / (storm_fname_array[2] + 'X' + '.pkl')
+    keras_X[1].to_pickle(pkl_path)
+
+    pkl_path = pkl_dir / (storm_fname_array[0] + 'y' + '.pkl')
+    keras_disc[0].to_pickle(pkl_path)
+    pkl_path = pkl_dir / (storm_fname_array[2] + 'y' + '.pkl')
+    keras_disc[1].to_pickle(pkl_path)
+    
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
     # remember we fitted the LinearRegression object regr on 2003 data
