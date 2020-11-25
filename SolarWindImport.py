@@ -5,6 +5,7 @@ import pathlib  # for compatibility with non UNIX/POSIX systems (ie Windows)
 import pandas as pd
 import numpy as np
 
+
 def import_omni_month(year, month, resolution='1min', cols='All'):
     """
     Finds local OMNI Data files, if not available attempts to download.
@@ -328,7 +329,6 @@ def storm_chunker(y_true, y_pred, y_pers, resolution='1h'):
 
     # now that every chunk for this storm is generated, return
     return chunks
-
 
 
 def main():

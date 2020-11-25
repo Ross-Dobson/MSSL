@@ -321,57 +321,6 @@ def main():
 
     def storm_metrics(y_true, y_pred, y_pers):
         """Runs various regression metrics from sklearn.metrics
-
-        Args:
-          y_true: The target values of discrete rolled-left AL
-          y_pred: The predicted values of discrete rolled-left AL from model
-          y_pers: The persistence (rolled-right) time history of AL
-
-        Returns:
-          None
-        """
-
-        # Explained variance score (higher is better, best 1.0)
-        evs_true = explained_variance_score(y_true, y_pred)
-        evs_pers = explained_variance_score(y_true, y_pers)
-
-        # Mean absolute error (lower is better, best 0.0)
-        mean_true = mean_absolute_error(y_true, y_pred)
-        mean_pers = mean_absolute_error(y_true, y_pers)
-
-        # Mean squared error (lower is better, best 0.0)
-        mse_true = mean_squared_error(y_true, y_pred)
-        mse_pers = mean_squared_error(y_true, y_pers)
-
-        # not too affected by outliers - good choice of metric?
-        # Median absolute error (lower is better, best 0.0)
-        medi_true = median_absolute_error(y_true, y_pred)
-        medi_pers = median_absolute_error(y_true, y_pers)
-
-        # variance is dependent on dataset, might be a pitfall
-        # R2 coefficient of determination (higher=better), best 1.0
-        r2_true = r2_score(y_true, y_pred)
-        r2_pers = r2_score(y_true, y_pers)
-
-        return evs_true, evs_pers, mean_true, mean_pers, mse_true, mse_pers, medi_true, medi_pers, r2_true, r2_pers
-
-    metrics = ["Explained variance score",
-               "Mean absolute error",
-               "Mean squared error",
-               "Median absolute error",
-               "R2 score"]
-
-    metrics_desc = ["higher is better, best 1.0",
-                    "lower is better, best 0.0",
-                    "lower is better, best 0.0",
-                    "lower is better, best 0.0",
-                    "higher is better, best 1.0"]
-
-    # 2003 data - don't actually want to run metrics on this though
-    # storm_metrics(y_test, pred_df, pers_AL)
-
-    def storm_metrics(y_true, y_pred, y_pers):
-        """Runs various regression metrics from sklearn.metrics
         Args:
           y_true: The target values of discrete rolled-left AL
           y_pred: The predicted values of discrete rolled-left AL from model
@@ -607,7 +556,7 @@ def main():
     keras_X = [X_array[0], X_array[2]]
     keras_raw = [raw_array[0], raw_array[2]]
     keras_disc = [disc_array[0], raw_array[2]]
-    
+
     pkl_path = pkl_dir / (storm_fname_array[0] + 'X' + '.pkl')
     keras_X[0].to_pickle(pkl_path)
     pkl_path = pkl_dir / (storm_fname_array[2] + 'X' + '.pkl')
@@ -617,7 +566,7 @@ def main():
     keras_disc[0].to_pickle(pkl_path)
     pkl_path = pkl_dir / (storm_fname_array[2] + 'y' + '.pkl')
     keras_disc[1].to_pickle(pkl_path)
-    
+
     # ---------------------------------------------------------------
     # PREDICTING THE DATA
     # remember we fitted the LinearRegression object regr on 2003 data
