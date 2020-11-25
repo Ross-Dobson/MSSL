@@ -260,7 +260,7 @@ def main():
 
     # ---------------------------------------------------------------
     # KERAS PREP STEP:
-    pkl_dir = pathlib.Path('/content/drive/My Drive/MSSL_DATA/pkl')
+    pkl_dir = pathlib.Path('~/Documents/Python/Projects/MSSL/Data/OMNI/pickles')
 
     pkl_path = pkl_dir / ('2003_' + 'X' + '.pkl')
     df_2003.to_pickle(pkl_path)
