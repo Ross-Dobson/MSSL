@@ -1,5 +1,5 @@
 Figures/
-Data/OMNI/pickles
+Data/
 __pycache__
 .ipynb_checkpoints
 notes.txt
